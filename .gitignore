@@ -25,3 +25,5 @@ Thumbs.db
 # AI 辅助配置 (个人工作区)
 CLAUDE.md
 AGENTS.md
+docs/ENTERPRISE-AGENT-ARCHITECTURE.md
+/public/presets

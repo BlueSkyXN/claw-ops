@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getAPI } from '../lib/api'
 import type { AgentSummary } from '../types/openclaw'
+import PresetBrowser from '../components/PresetBrowser'
+
+type TabView = 'agents' | 'presets'
 
 function AgentCard({ agent, onDelete }: { agent: AgentSummary; onDelete: (id: string) => void }) {
   return (
@@ -98,8 +101,9 @@ export default function Agents() {
   const [agents, setAgents] = useState<AgentSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+  const [activeTab, setActiveTab] = useState<TabView>('agents')
 
-  const fetchAgents = async () => {
+  const fetchAgents = useCallback(async () => {
     try {
       const data = await getAPI().getAgents()
       setAgents(data)
@@ -108,9 +112,9 @@ export default function Agents() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  useEffect(() => { fetchAgents() }, [])
+  useEffect(() => { fetchAgents() }, [fetchAgents])
 
   const handleDelete = async (agentId: string) => {
     if (!confirm(`确认删除智能体 "${agentId}"？`)) return
@@ -122,6 +126,12 @@ export default function Agents() {
     }
   }
 
+  // 预设导入完成后切回智能体列表并刷新
+  const handlePresetImported = useCallback(() => {
+    setActiveTab('agents')
+    fetchAgents()
+  }, [fetchAgents])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64 text-text-secondary text-sm">
@@ -132,28 +142,64 @@ export default function Agents() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header with tabs */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-text-primary">
-          智能体列表
-          <span className="ml-2 text-text-muted font-normal">({agents.length})</span>
-        </h3>
-        <button onClick={() => setShowCreate(true)} className="btn-primary text-xs flex items-center gap-1.5">
-          <span>＋</span> 创建智能体
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setActiveTab('agents')}
+            className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${
+              activeTab === 'agents'
+                ? 'bg-brand-50 text-brand-600 font-semibold'
+                : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+            }`}
+          >
+            🤖 智能体
+            <span className="ml-1.5 text-text-muted font-normal">({agents.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('presets')}
+            className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${
+              activeTab === 'presets'
+                ? 'bg-brand-50 text-brand-600 font-semibold'
+                : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+            }`}
+          >
+            📦 预设角色库
+          </button>
+        </div>
+        {activeTab === 'agents' && (
+          <button onClick={() => setShowCreate(true)} className="btn-primary text-xs flex items-center gap-1.5">
+            <span>＋</span> 创建智能体
+          </button>
+        )}
       </div>
 
-      {/* Agent grid */}
-      {agents.length === 0 ? (
-        <div className="card p-12 text-center text-text-secondary text-sm">
-          暂无智能体，点击上方按钮创建
-        </div>
+      {/* Tab content */}
+      {activeTab === 'agents' ? (
+        <>
+          {/* Agent grid */}
+          {agents.length === 0 ? (
+            <div className="card p-12 text-center text-text-secondary text-sm">
+              <p className="mb-3">暂无智能体</p>
+              <div className="flex items-center justify-center gap-3">
+                <button onClick={() => setShowCreate(true)} className="btn-secondary text-xs">
+                  ＋ 空白创建
+                </button>
+                <button onClick={() => setActiveTab('presets')} className="btn-primary text-xs">
+                  📦 从预设导入
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4">
+              {agents.map((a) => (
+                <AgentCard key={a.id} agent={a} onDelete={handleDelete} />
+              ))}
+            </div>
+          )}
+        </>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
-          {agents.map((a) => (
-            <AgentCard key={a.id} agent={a} onDelete={handleDelete} />
-          ))}
-        </div>
+        <PresetBrowser onImported={handlePresetImported} />
       )}
 
       {/* Create modal */}

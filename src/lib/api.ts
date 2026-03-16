@@ -6,6 +6,7 @@ import { getGatewayClient } from './gateway-client'
 import type {
   AgentSummary,
   AgentsListResult,
+  AgentsFileEntry,
   SessionsListParams,
   SessionsListResult,
   SessionsUsageParams,
@@ -50,6 +51,14 @@ export interface DataAPI {
   createAgent(params: AgentsCreateParams): Promise<{ agentId: string }>
   updateAgent(params: AgentsUpdateParams): Promise<void>
   deleteAgent(params: AgentsDeleteParams): Promise<void>
+
+  // Agent Files — 用于预设角色导入 (SOUL.md, config 等)
+  agentFilesList(agentId: string): Promise<AgentsFileEntry[]>
+  agentFilesGet(agentId: string, path: string): Promise<string>
+  agentFilesSet(agentId: string, path: string, content: string): Promise<void>
+
+  // Skills — 技能安装
+  installSkill(skillId: string): Promise<void>
 
   // Sessions
   getSessions(params?: SessionsListParams): Promise<SessionsListResult>
@@ -127,6 +136,28 @@ class GatewayAPI implements DataAPI {
 
   async deleteAgent(params: AgentsDeleteParams) {
     await this.client.request(GATEWAY_METHODS.AGENTS_DELETE, params)
+  }
+
+  async agentFilesList(agentId: string) {
+    const result = await this.client.request<{ files: AgentsFileEntry[] }>(
+      GATEWAY_METHODS.AGENTS_FILES_LIST, { agentId }
+    )
+    return result?.files ?? []
+  }
+
+  async agentFilesGet(agentId: string, path: string) {
+    const result = await this.client.request<{ content: string }>(
+      GATEWAY_METHODS.AGENTS_FILES_GET, { agentId, path }
+    )
+    return result?.content ?? ''
+  }
+
+  async agentFilesSet(agentId: string, path: string, content: string) {
+    await this.client.request(GATEWAY_METHODS.AGENTS_FILES_SET, { agentId, path, content })
+  }
+
+  async installSkill(skillId: string) {
+    await this.client.request(GATEWAY_METHODS.SKILLS_INSTALL, { skillId })
   }
 
   async getSessions(params?: SessionsListParams) {
@@ -262,6 +293,10 @@ const mockAPI: DataAPI = {
   async createAgent() { return { agentId: 'new-agent' } },
   async updateAgent() {},
   async deleteAgent() {},
+  async agentFilesList() { return [] },
+  async agentFilesGet() { return '' },
+  async agentFilesSet() {},
+  async installSkill() {},
   async getSessions() { return mock.mockSessionsList },
   async patchSession() {},
   async resetSession() {},

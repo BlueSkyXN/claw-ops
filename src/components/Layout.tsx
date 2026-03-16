@@ -102,7 +102,7 @@ export default function Layout() {
             <span>{modeInfo.icon} {modeInfo.name}</span>
           </div>
           <p className="text-[10px] text-text-muted mt-1">
-            v0.2.0{config.mode === 'realtime' ? ' · Gateway' : ' · Mock'}
+            v0.1.0{config.mode === 'realtime' ? ' · Gateway' : ' · Mock'}
           </p>
         </div>
       </aside>
