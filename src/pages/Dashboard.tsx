@@ -7,6 +7,7 @@ import ExecutivePerformanceBoard from '../components/ExecutivePerformanceBoard'
 import MissionDispatchPanel from '../components/MissionDispatchPanel'
 import OrchestratorHealthStrip from '../components/OrchestratorHealthStrip'
 import QuickStartBanner from '../components/QuickStartBanner'
+import TaskActivityFeed from '../components/TaskActivityFeed'
 import { importExperiencePreset } from '../lib/orchestration'
 import { dispatchMission, loadOrchestrationRuntime, performTaskIntervention, subscribeToOrchestrationEvents, type MissionDispatchInput } from '../lib/orchestration-runtime'
 import type { TrackedTask } from '../lib/task-tracker'
@@ -162,19 +163,6 @@ export default function Dashboard() {
     }
   }, [loadData])
 
-  const connectedAccounts = useMemo(() => {
-    if (!runtime?.channels) return 0
-    let count = 0
-    for (const accounts of Object.values(runtime.channels.channelAccounts)) {
-      for (const acc of accounts) {
-        if (acc.connected) count += 1
-      }
-    }
-    return count
-  }, [runtime?.channels])
-
-  const totalChannels = useMemo(() => runtime?.channels.channelOrder.length ?? 0, [runtime?.channels])
-
   const dailyData = useMemo(() => {
     if (!runtime?.usage.aggregates?.daily) return []
     return runtime.usage.aggregates.daily.map((entry) => ({
@@ -214,28 +202,28 @@ export default function Dashboard() {
       bg: 'bg-pastel-blue/20',
     },
     {
-      label: '待审批',
-      value: runtime?.taskSummary.pendingApprovals ?? 0,
-      sub: runtime ? `停滞 ${runtime.taskSummary.stalled} 个` : undefined,
-      icon: '🔒',
+      label: '治理压力',
+      value: runtime ? runtime.taskSummary.pendingApprovals + runtime.taskSummary.blocked : 0,
+      sub: runtime ? `审批 ${runtime.taskSummary.pendingApprovals} · 阻断 ${runtime.taskSummary.blocked}` : undefined,
+      icon: '🛡️',
       color: 'text-accent-yellow',
       bg: 'bg-pastel-yellow/20',
     },
     {
-      label: '已连接渠道',
-      value: connectedAccounts,
-      sub: `共 ${totalChannels} 个渠道`,
-      icon: '📡',
-      color: 'text-accent-green',
-      bg: 'bg-pastel-green/20',
-    },
-    {
-      label: '总费用',
-      value: runtime ? formatCost(runtime.usage.totals.totalCost) : '-',
-      sub: runtime ? `${runtime.usage.totals.totalTokens.toLocaleString()} tokens` : undefined,
-      icon: '💰',
+      label: '任务动向',
+      value: runtime?.tasks.filter((task) => Date.now() - task.updatedAt < 60 * 60_000).length ?? 0,
+      sub: '最近 1 小时有动作',
+      icon: '📜',
       color: 'text-accent-cyan',
       bg: 'bg-pastel-cyan/20',
+    },
+    {
+      label: '交付风险',
+      value: runtime ? runtime.taskSummary.stalled + runtime.taskSummary.failed : 0,
+      sub: runtime ? `停滞 ${runtime.taskSummary.stalled} · 失败 ${runtime.taskSummary.failed}` : undefined,
+      icon: '⚠️',
+      color: 'text-accent-red',
+      bg: 'bg-pastel-red/20',
     },
   ]
 
@@ -268,7 +256,6 @@ export default function Dashboard() {
       <MissionDispatchPanel
         roles={runtime?.activeExperiencePreset?.roles ?? []}
         quickStarts={runtime?.activeExperiencePreset?.summary.quickStarts ?? []}
-        channelsStatus={runtime?.channels ?? null}
         busy={missionBusy}
         disabledReason={runtime?.activeExperiencePreset ? null : '先导入并激活企业编排团队，才能把 Mission 投递给组织负责人。'}
         onDispatch={handleMissionDispatch}
@@ -313,6 +300,13 @@ export default function Dashboard() {
         maxItems={4}
       />
 
+      <TaskActivityFeed
+        tasks={runtime?.tasks ?? []}
+        logs={runtime?.logs ?? []}
+        title="任务动向与日志"
+        subtitle="优先监控过程推进、阻塞变化和关键日志；用量与成本退居次要位置。"
+      />
+
       {error && (
         <div className="rounded-2xl border border-accent-red/30 bg-pastel-red/20 px-4 py-3 text-sm text-accent-red">
           {error}
@@ -320,7 +314,7 @@ export default function Dashboard() {
       )}
 
       <div className="card p-5">
-        <h3 className="text-sm font-semibold text-text-primary mb-4">用量趋势 · 近 14 天</h3>
+        <h3 className="text-sm font-semibold text-text-primary mb-4">次要 · 用量趋势（近 14 天）</h3>
         {loading ? (
           <Skeleton className="h-[240px] w-full" />
         ) : dailyData.length > 0 ? (
@@ -358,7 +352,7 @@ export default function Dashboard() {
       </div>
 
       <div className="card p-5">
-        <h3 className="text-sm font-semibold text-text-primary mb-4">模型用量分布</h3>
+        <h3 className="text-sm font-semibold text-text-primary mb-4">次要 · 模型用量分布</h3>
         {loading ? (
           <Skeleton className="h-[200px] w-full" />
         ) : modelData.length > 0 ? (

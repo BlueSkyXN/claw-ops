@@ -2,17 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ExperienceQuickStart } from '../lib/orchestration'
 import type { PresetRoleDetail } from '../lib/presets'
 import type { MissionDispatchInput } from '../lib/orchestration-runtime'
-import type { ChannelsStatusResult } from '../types/openclaw'
 import AgentLayerBadge from './AgentLayerBadge'
 
 export type MissionPriority = 'normal' | 'high' | 'critical'
-
-interface ChannelOption {
-  id: string
-  label: string
-  available: boolean
-  reason: string | null
-}
 
 function preferredOwnerRoleId(roles: PresetRoleDetail[]): string {
   return roles.find((role) => role.manifest.layer === 'L1')?.manifest.id
@@ -35,17 +27,15 @@ function priorityMeta(priority: MissionPriority) {
 export default function MissionDispatchPanel({
   roles,
   quickStarts,
-  channelsStatus = null,
   compact = false,
   busy = false,
   disabledReason = null,
   title = 'CEO 发令台',
-  subtitle = '直接向组织下达目标，让编排从观察走向主动驱动。',
+  subtitle = '直接向组织下达目标，统一从控制面入口发起，让编排从观察走向主动驱动。',
   onDispatch,
 }: {
   roles: PresetRoleDetail[]
   quickStarts: ExperienceQuickStart[]
-  channelsStatus?: ChannelsStatusResult | null
   compact?: boolean
   busy?: boolean
   disabledReason?: string | null
@@ -53,51 +43,12 @@ export default function MissionDispatchPanel({
   subtitle?: string
   onDispatch: (input: MissionDispatchInput) => Promise<void> | void
 }) {
-  const channelOptions = useMemo(() => {
-    const runtimeChannels = new Set<string>(channelsStatus?.channelOrder ?? [])
-    Object.keys(channelsStatus?.channelAccounts ?? {}).forEach((channel) => runtimeChannels.add(channel))
-
-    if (!channelsStatus) {
-      const channels = new Set<string>(['web'])
-      quickStarts.forEach((quickStart) => channels.add(quickStart.channel))
-      const knownChannels = Array.from(channels)
-      return knownChannels.map((channel): ChannelOption => ({
-        id: channel,
-        label: channel,
-        available: true,
-        reason: null,
-      }))
-    }
-
-    if (runtimeChannels.size === 0) {
-      return [{ id: 'web', label: 'Web', available: true, reason: null }]
-    }
-
-    const channels = new Set<string>(runtimeChannels)
-    quickStarts.forEach((quickStart) => channels.add(quickStart.channel))
-    const knownChannels = Array.from(channels)
-
-    const options = knownChannels.map((channel) => {
-      const accounts = channelsStatus.channelAccounts[channel] ?? []
-      const hasRuntimeEntry = runtimeChannels.has(channel)
-      const available = hasRuntimeEntry && accounts.some((account) => account.connected || account.configured || account.enabled || account.linked)
-      return {
-        id: channel,
-        label: channelsStatus.channelLabels[channel] ?? channel,
-        available,
-        reason: available ? null : (hasRuntimeEntry ? '未连接' : '未配置'),
-      }
-    })
-    return options
-  }, [channelsStatus, quickStarts])
-
   const [form, setForm] = useState<MissionDispatchInput>({
     title: '',
     brief: '',
     successCriteria: '',
     ownerRoleId: preferredOwnerRoleId(roles),
     priority: 'high',
-    channel: channelOptions.find((option) => option.available)?.id ?? channelOptions[0]?.id ?? 'web',
   })
 
   useEffect(() => {
@@ -106,20 +57,16 @@ export default function MissionDispatchPanel({
       ownerRoleId: roles.some((role) => role.manifest.id === current.ownerRoleId)
         ? current.ownerRoleId
         : preferredOwnerRoleId(roles),
-      channel: channelOptions.some((option) => option.id === current.channel && option.available)
-        ? current.channel
-        : (channelOptions.find((option) => option.available)?.id ?? channelOptions[0]?.id ?? 'web'),
     }))
-  }, [channelOptions, roles])
+  }, [roles])
 
   const selectedRole = useMemo(
     () => roles.find((role) => role.manifest.id === form.ownerRoleId) ?? null,
     [form.ownerRoleId, roles],
   )
-  const availableChannel = channelOptions.find((option) => option.id === form.channel)
 
   const priority = priorityMeta(form.priority)
-  const canSubmit = form.title.trim() !== '' && form.brief.trim() !== '' && form.successCriteria.trim() !== '' && form.ownerRoleId !== '' && !!availableChannel?.available && !busy && !disabledReason
+  const canSubmit = form.title.trim() !== '' && form.brief.trim() !== '' && form.successCriteria.trim() !== '' && form.ownerRoleId !== '' && !busy && !disabledReason
 
   const applyQuickStart = (quickStart: ExperienceQuickStart) => {
     setForm({
@@ -128,10 +75,6 @@ export default function MissionDispatchPanel({
       successCriteria: quickStart.outcome,
       ownerRoleId: quickStart.ownerRoleId,
       priority: 'high',
-      channel: channelOptions.find((option) => option.id === quickStart.channel && option.available)?.id
-        ?? channelOptions.find((option) => option.available)?.id
-        ?? channelOptions[0]?.id
-        ?? 'web',
     })
   }
 
@@ -144,7 +87,6 @@ export default function MissionDispatchPanel({
         successCriteria: form.successCriteria.trim(),
         ownerRoleId: form.ownerRoleId,
         priority: form.priority,
-        channel: form.channel,
       })
       setForm((current) => ({
         ...current,
@@ -169,7 +111,7 @@ export default function MissionDispatchPanel({
           <p className="text-xs text-text-secondary mt-1 leading-5">{subtitle}</p>
         </div>
         <div className="text-[11px] text-text-secondary rounded-2xl border border-surface-border bg-surface-bg px-3 py-2">
-          通过 `chat.send` 直接把目标投递给组织负责人，保持纯前端架构。
+          通过 `chat.send` 直接把目标投递给组织负责人，统一从控制面入口发起，保持纯前端架构。
         </div>
       </div>
 
@@ -186,7 +128,7 @@ export default function MissionDispatchPanel({
                 disabled={busy}
               >
                 <span className="font-medium">{quickStart.title}</span>
-                <span className="block text-text-muted mt-1">{quickStart.channel} · {quickStart.user}</span>
+                <span className="block text-text-muted mt-1">典型发起人：{quickStart.user}</span>
               </button>
             ))}
           </div>
@@ -237,7 +179,7 @@ export default function MissionDispatchPanel({
             />
           </label>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="space-y-1.5 text-xs text-text-secondary">
               <span>负责人</span>
               <select
@@ -266,28 +208,13 @@ export default function MissionDispatchPanel({
                 <option value="critical">紧急推进</option>
               </select>
             </label>
-            <label className="space-y-1.5 text-xs text-text-secondary">
-              <span>入口渠道</span>
-              <select
-                value={form.channel}
-                onChange={(event) => setForm((current) => ({ ...current, channel: event.target.value }))}
-                className="w-full rounded-xl border border-surface-border bg-white px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-300"
-                disabled={busy || !!disabledReason}
-              >
-                {channelOptions.map((channel) => (
-                  <option key={channel.id} value={channel.id} disabled={!channel.available}>
-                    {channel.label}{channel.available ? '' : ` · ${channel.reason}`}
-                  </option>
-                ))}
-              </select>
-            </label>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-surface-border pt-3">
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-secondary">
               <span className={`badge ${priority.badge}`}>{priority.label}</span>
               <span>{priority.hint}</span>
-              {availableChannel && !availableChannel.available && <span className="text-accent-red">当前渠道不可用</span>}
+              <span className="badge badge-cyan">统一入口 Web</span>
             </div>
             <button type="button" onClick={() => void handleDispatch()} className="btn-primary text-xs" disabled={!canSubmit}>
               {busy ? '正在下达...' : '🚀 下达 Mission'}

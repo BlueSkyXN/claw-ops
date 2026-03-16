@@ -4,6 +4,7 @@
 import type {
   ConnectParams,
   HelloOk,
+  GatewayClientId,
   GatewayScope,
   GatewayClientMode,
   ResponseFrame,
@@ -14,6 +15,7 @@ import type {
 } from '../types/openclaw'
 
 const PROTOCOL_VERSION = 1
+const DEFAULT_GATEWAY_CLIENT_ID: GatewayClientId = 'openclaw-control-ui'
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
 
@@ -22,7 +24,8 @@ export interface GatewayClientOptions {
   token?: string
   password?: string
   scopes?: GatewayScope[]
-  clientName?: string
+  clientName?: GatewayClientId
+  clientDisplayName?: string
   clientMode?: GatewayClientMode
   instanceId?: string
   onStateChange?: (state: ConnectionState) => void
@@ -55,7 +58,8 @@ export class GatewayClient {
   constructor(options: GatewayClientOptions) {
     this.options = {
       scopes: ['operator.read', 'operator.write'],
-      clientName: 'claw-ops',
+      clientName: DEFAULT_GATEWAY_CLIENT_ID,
+      clientDisplayName: 'claw-ops',
       clientMode: 'ui',
       instanceId: crypto.randomUUID(),
       reconnect: true,
@@ -207,7 +211,8 @@ export class GatewayClient {
       minProtocol: PROTOCOL_VERSION,
       maxProtocol: PROTOCOL_VERSION,
       client: {
-        id: this.options.clientName!,
+        id: this.options.clientName ?? DEFAULT_GATEWAY_CLIENT_ID,
+        displayName: this.options.clientDisplayName,
         version: '0.1.0',
         platform: navigator.platform,
         mode: this.options.clientMode || 'ui',

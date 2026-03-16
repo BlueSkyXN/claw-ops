@@ -34,6 +34,7 @@ import AgentLayerBadge from '../components/AgentLayerBadge'
 import MissionDispatchPanel from '../components/MissionDispatchPanel'
 import OrchestratorHealthStrip from '../components/OrchestratorHealthStrip'
 import RoleOperatingPolicyPanel from '../components/RoleOperatingPolicyPanel'
+import TaskActivityFeed from '../components/TaskActivityFeed'
 import TaskStepTimeline from '../components/TaskStepTimeline'
 import TeamPresetsPanel from '../components/TeamPresetsPanel'
 
@@ -771,7 +772,7 @@ function TaskControlCard({
 
 export default function Orchestration() {
   const [viewMode, setViewMode] = useState<ViewMode>('graph')
-  const [interactionMode, setInteractionMode] = useState<InteractionMode>('read')
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>('edit')
   const [focusMode, setFocusMode] = useState(false)
   const [presets, setPresets] = useState<ExperiencePresetSummary[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
@@ -1075,10 +1076,10 @@ export default function Orchestration() {
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-surface-border pt-3">
               <div className="flex flex-wrap items-center gap-2">
                 <button onClick={() => setInteractionMode('read')} className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${interactionMode === 'read' ? 'bg-brand-50 text-brand-600 font-semibold' : 'bg-surface-hover text-text-secondary hover:text-text-primary'}`}>
-                  👀 阅读模式
+                  🔒 浏览锁定
                 </button>
                 <button onClick={() => setInteractionMode('edit')} className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${interactionMode === 'edit' ? 'bg-brand-50 text-brand-600 font-semibold' : 'bg-surface-hover text-text-secondary hover:text-text-primary'}`}>
-                  ✍️ 编辑模式
+                  ✍️ 布局拖动
                 </button>
                 <button onClick={() => setFocusMode((current) => !current)} className="btn-secondary text-xs">
                   {focusMode ? '退出专注' : '专注阅读'}
@@ -1094,14 +1095,14 @@ export default function Orchestration() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-secondary">
-              <span className="badge badge-blue">蓝色：当前执行路径</span>
-              <span className="badge badge-green">绿色：已完成</span>
-              <span className="badge badge-yellow">黄色：待审批 / 门禁</span>
-              <span className="badge badge-red">红色：阻断 / 失败</span>
-              <span className="badge badge-purple">{interactionMode === 'read' ? '拖动画布浏览' : '拖动节点调整布局'}</span>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-secondary">
+                <span className="badge badge-blue">蓝色：当前执行路径</span>
+                <span className="badge badge-green">绿色：已完成</span>
+                <span className="badge badge-yellow">黄色：待审批 / 门禁</span>
+                <span className="badge badge-red">红色：阻断 / 失败</span>
+                <span className="badge badge-purple">{interactionMode === 'edit' ? '空白区平移 · 卡片直接拖动' : '空白区平移 · 卡片锁定防误触'}</span>
+              </div>
             </div>
-          </div>
 
           <div className={`card relative overflow-hidden ${focusMode ? 'h-[860px]' : 'h-[760px]'}`}>
             {viewMode === 'graph' && loadedExperience && (
@@ -1137,7 +1138,7 @@ export default function Orchestration() {
               fitViewOptions={{ padding: 0.22 }}
               minZoom={0.2}
               maxZoom={2}
-              panOnDrag={interactionMode === 'read'}
+              panOnDrag
               nodesDraggable={interactionMode === 'edit'}
               selectionOnDrag={interactionMode === 'edit'}
               zoomOnDoubleClick={interactionMode === 'edit'}
@@ -1197,7 +1198,6 @@ export default function Orchestration() {
               subtitle={activePreset ? `当前向 ${activePreset.summary.name} 下达目标与经营动作。` : '先激活团队，再向组织负责人发起 Mission。'}
               roles={activePreset?.roles ?? []}
               quickStarts={activePreset?.summary.quickStarts ?? []}
-              channelsStatus={runtime?.channels ?? null}
               busy={missionBusy}
               disabledReason={activePreset ? null : '当前没有运行中的企业编排团队，无法投递 Mission。'}
               onDispatch={handleMissionDispatch}
@@ -1212,6 +1212,14 @@ export default function Orchestration() {
               busyKey={actionBusyKey}
             />
             <TaskControlCard task={selectedTask} activePreset={activePreset} busyKey={actionBusyKey} onAction={handleTaskAction} />
+            <TaskActivityFeed
+              tasks={runtime?.tasks ?? []}
+              logs={runtime?.logs ?? []}
+              selectedTask={selectedTask}
+              title={selectedTask ? '选中任务过程与日志' : '任务动向与日志'}
+              subtitle={selectedTask ? '聚焦当前任务的阶段推进、门禁变化与相关日志。' : '优先看过程推进和日志，而不是渠道与成本。'}
+              maxItems={5}
+            />
             <TeamPresetsPanel
               presets={presets}
               selectedId={selectedTemplateId}

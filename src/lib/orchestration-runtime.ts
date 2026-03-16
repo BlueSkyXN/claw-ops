@@ -40,7 +40,6 @@ export interface MissionDispatchInput {
   successCriteria: string
   ownerRoleId: string
   priority: 'normal' | 'high' | 'critical'
-  channel: string
 }
 
 export type TaskInterventionAction =
@@ -176,7 +175,7 @@ function buildMissionDispatchMessage(input: MissionDispatchInput): string {
 }
 
 function buildMissionSessionKey(input: MissionDispatchInput): string {
-  return `sess-${input.channel}-dispatch-${slug(input.title)}-${Date.now()}-${input.ownerRoleId}`
+  return `sess-web-dispatch-${slug(input.title)}-${Date.now()}-${input.ownerRoleId}`
 }
 
 function buildRerouteParams(task: TrackedTask, targetRoleId: string): ChatSendParams {
@@ -204,7 +203,7 @@ export async function dispatchMission(input: MissionDispatchInput): Promise<void
     sessionKey,
     text: buildMissionDispatchMessage(input),
     agentId: input.ownerRoleId,
-    channel: input.channel,
+    channel: 'web',
     metadata: {
       controlAction: 'mission-dispatch',
       taskTitle: input.title,

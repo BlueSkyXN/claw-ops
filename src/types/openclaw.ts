@@ -34,7 +34,7 @@ export interface ConnectParams {
 }
 
 export interface GatewayClientInfo {
-  id: string
+  id: GatewayClientId
   displayName?: string
   version: string
   platform: string
@@ -43,6 +43,20 @@ export interface GatewayClientInfo {
   mode: GatewayClientMode
   instanceId?: string
 }
+
+export type GatewayClientId =
+  | 'webchat-ui'
+  | 'openclaw-control-ui'
+  | 'webchat'
+  | 'cli'
+  | 'gateway-client'
+  | 'openclaw-macos'
+  | 'openclaw-ios'
+  | 'openclaw-android'
+  | 'node-host'
+  | 'test'
+  | 'fingerprint'
+  | 'openclaw-probe'
 
 export type GatewayClientMode = 'ui' | 'cli' | 'backend' | 'node' | 'probe' | 'test' | 'webchat'
 

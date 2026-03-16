@@ -29,6 +29,17 @@ function formatUptime(ms: number): string {
   return `${d} 天 ${h % 24} 小时`
 }
 
+function formatConnectionErrorMessage(rawMessage: string): string {
+  const message = rawMessage.trim()
+  if (message.includes('INVALID_REQUEST: invalid connect params')) {
+    if (message.includes('/client/id')) {
+      return '连接失败：客户端握手参数不符合 Gateway 协议（client.id 无效）。请升级到包含最新 Gateway 握手修复的 claw-ops 版本后重试。'
+    }
+    return '连接失败：客户端握手参数不符合 Gateway 协议。请升级 claw-ops 或检查握手配置后重试。'
+  }
+  return `连接失败：${message}`
+}
+
 export default function Setup() {
   const navigate = useNavigate()
   const [step, setStep] = useState<Step>('mode')
@@ -111,7 +122,7 @@ export default function Setup() {
       },
       onError: (err) => {
         setTestStatus('fail')
-        setTestMessage(`连接失败：${err.message}`)
+        setTestMessage(formatConnectionErrorMessage(err.message))
       },
     })
 
@@ -121,7 +132,7 @@ export default function Setup() {
       client.connect()
     } catch (err) {
       setTestStatus('fail')
-      setTestMessage(`连接失败：${err instanceof Error ? err.message : '未知错误'}`)
+      setTestMessage(formatConnectionErrorMessage(err instanceof Error ? err.message : '未知错误'))
       return
     }
 
@@ -369,7 +380,7 @@ export default function Setup() {
                   <div className="text-center space-y-3">
                     <div className="text-4xl">❌</div>
                     <p className="text-accent-red font-medium text-sm">{testMessage}</p>
-                    <p className="text-xs text-text-muted">请检查地址和认证信息，或跳过测试稍后配置</p>
+                    <p className="text-xs text-text-muted">请检查网关地址、认证方式与协议兼容性，或跳过测试稍后配置</p>
                   </div>
                 )}
               </div>
