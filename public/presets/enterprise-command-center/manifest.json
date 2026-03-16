@@ -262,6 +262,12 @@
   ],
   "teamTemplates": [
     {
+      "id": "opc-super-assistant",
+      "name": "OPC 超级助理",
+      "nameEn": "OPC Super Assistant",
+      "path": "teams/opc-super-assistant.json"
+    },
+    {
       "id": "full-enterprise-command-center",
       "name": "企业级超级编排中心",
       "nameEn": "Full Enterprise Command Center",

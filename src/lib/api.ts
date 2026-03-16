@@ -34,7 +34,7 @@ import type {
   ExecApprovalRequest,
 } from '../types/openclaw'
 import { GATEWAY_METHODS } from '../types/openclaw'
-import * as mock from '../data/mock'
+import * as mockWorkspace from '../data/mock-workspace'
 
 // ==========================================
 // 统一 API 接口
@@ -285,36 +285,85 @@ function parseLogLines(lines: string[]): LogEntry[] {
 // Mock 实现
 // ==========================================
 
+function filterMockSessions(base: SessionsListResult, params?: SessionsListParams): SessionsListResult {
+  let sessions = [...base.sessions]
+
+  if (!params?.includeGlobal) {
+    sessions = sessions.filter((session) => session.kind !== 'global')
+  }
+  if (!params?.includeUnknown) {
+    sessions = sessions.filter((session) => session.kind !== 'unknown')
+  }
+  if (params?.label) {
+    sessions = sessions.filter((session) => session.label?.includes(params.label ?? ''))
+  }
+  if (params?.limit) {
+    sessions = sessions.slice(0, params.limit)
+  }
+
+  return {
+    ...base,
+    ts: Date.now(),
+    count: sessions.length,
+    sessions,
+  }
+}
+
+function filterMockCronRuns(runs: CronRunLogEntry[], params?: CronRunsParams): CronRunLogEntry[] {
+  let filtered = [...runs]
+
+  if (params?.id || params?.jobId) {
+    const jobId = params.id ?? params.jobId
+    filtered = filtered.filter((run) => run.jobId === jobId)
+  }
+  if (params?.status && params.status !== 'all') {
+    filtered = filtered.filter((run) => run.status === params.status)
+  }
+  filtered.sort((left, right) => params?.sort === 'asc' ? left.startedAtMs - right.startedAtMs : right.startedAtMs - left.startedAtMs)
+  if (params?.limit) {
+    filtered = filtered.slice(0, params.limit)
+  }
+  return filtered
+}
+
+function filterMockLogs(entries: LogEntry[], params?: LogsTailParams): LogEntry[] {
+  const limit = params?.limit ?? 200
+  return entries.slice(0, limit)
+}
+
 const mockAPI: DataAPI = {
-  async getHealth() { return { ok: true, uptimeMs: 86400000 } },
-  async getSnapshot() { return mock.mockSnapshot },
-  async getPresence() { return mock.mockPresence },
-  async getAgents() { return mock.mockAgents },
-  async createAgent() { return { agentId: 'new-agent' } },
-  async updateAgent() {},
-  async deleteAgent() {},
-  async agentFilesList() { return [] },
-  async agentFilesGet() { return '' },
-  async agentFilesSet() {},
-  async installSkill() {},
-  async getSessions() { return mock.mockSessionsList },
-  async patchSession() {},
-  async resetSession() {},
-  async deleteSession() {},
-  async getSessionsUsage() { return mock.mockUsage },
-  async getChannelsStatus() { return mock.mockChannelsStatus },
-  async getCronJobs() { return mock.mockCronJobs },
+  async getHealth() {
+    const snapshot = mockWorkspace.getMockSnapshot()
+    return { ok: true, uptimeMs: snapshot.uptimeMs }
+  },
+  async getSnapshot() { return mockWorkspace.getMockSnapshot() },
+  async getPresence() { return mockWorkspace.getMockPresence() },
+  async getAgents() { return mockWorkspace.getMockAgents() },
+  async createAgent(params) { return mockWorkspace.createMockAgent(params) },
+  async updateAgent(params) { mockWorkspace.updateMockAgent(params) },
+  async deleteAgent(params) { mockWorkspace.deleteMockAgent(params) },
+  async agentFilesList(agentId) { return mockWorkspace.listMockAgentFiles(agentId) },
+  async agentFilesGet(agentId, path) { return mockWorkspace.getMockAgentFile(agentId, path) },
+  async agentFilesSet(agentId, path, content) { mockWorkspace.setMockAgentFile(agentId, path, content) },
+  async installSkill(skillId) { mockWorkspace.installMockSkill(skillId) },
+  async getSessions(params) { return filterMockSessions(mockWorkspace.getMockSessionsList(), params) },
+  async patchSession(params) { mockWorkspace.patchMockSession(params) },
+  async resetSession(key) { mockWorkspace.resetMockSession(key) },
+  async deleteSession(key) { mockWorkspace.deleteMockSession(key) },
+  async getSessionsUsage() { return mockWorkspace.getMockUsage() },
+  async getChannelsStatus() { return mockWorkspace.getMockChannelsStatus() },
+  async getCronJobs() { return mockWorkspace.getMockCronJobs() },
   async addCronJob() { return { id: 'new-cron' } },
   async updateCronJob() {},
   async removeCronJob() {},
   async runCronJob() {},
-  async getCronRuns() { return mock.mockCronRuns },
-  async getLogs() { return mock.mockLogs },
-  async getModels() { return mock.mockModels },
-  async getSkills() { return mock.mockSkills },
-  async getNodes() { return mock.mockNodes },
-  async getConfig() { return mock.mockConfig },
-  async getExecApprovals() { return mock.mockExecApprovals },
+  async getCronRuns(params) { return filterMockCronRuns(mockWorkspace.getMockCronRuns(), params) },
+  async getLogs(params) { return filterMockLogs(mockWorkspace.getMockLogs(), params) },
+  async getModels() { return mockWorkspace.getMockModels() },
+  async getSkills() { return mockWorkspace.getMockSkills() },
+  async getNodes() { return mockWorkspace.getMockNodes() },
+  async getConfig() { return mockWorkspace.getMockConfig() },
+  async getExecApprovals() { return mockWorkspace.getMockExecApprovals() },
   async resolveExecApproval() {},
 }
 

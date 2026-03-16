@@ -1,0 +1,81 @@
+{
+  "id": "opc-super-assistant",
+  "name": "OPC 超级助理",
+  "nameEn": "OPC Super Assistant",
+  "description": "面向一人公司与超级个体的混合编排模板，把需求分流、策略规划、方案设计、工程执行、内容触达与经营复盘组织成统一工作流。",
+  "roles": [
+    "quality-director",
+    "dispatch-director",
+    "strategy-advisor",
+    "solution-architect",
+    "program-manager",
+    "engineering-lead",
+    "backend-engineer",
+    "frontend-engineer",
+    "platform-ops",
+    "data-analyst",
+    "content-strategist"
+  ],
+  "workflow": [
+    {
+      "from": "dispatch-director",
+      "to": "strategy-advisor",
+      "condition": "复杂目标需要拆解为可经营的机会与路线图",
+      "mandatory": true
+    },
+    {
+      "from": "strategy-advisor",
+      "to": "solution-architect",
+      "condition": "需要形成产品与系统执行方案",
+      "mandatory": true
+    },
+    {
+      "from": "dispatch-director",
+      "to": "program-manager",
+      "condition": "进入任务编排与优先级调度",
+      "mandatory": true
+    },
+    {
+      "from": "solution-architect",
+      "to": "engineering-lead",
+      "condition": "方案确认后进入工程执行编排",
+      "mandatory": true
+    },
+    {
+      "from": "engineering-lead",
+      "to": "backend-engineer",
+      "condition": "需要后端能力、接口或自动化实现",
+      "mandatory": false
+    },
+    {
+      "from": "engineering-lead",
+      "to": "frontend-engineer",
+      "condition": "需要用户界面、落地页或交互实现",
+      "mandatory": false
+    },
+    {
+      "from": "engineering-lead",
+      "to": "platform-ops",
+      "condition": "需要部署、环境、监控或运维响应",
+      "mandatory": false
+    },
+    {
+      "from": "program-manager",
+      "to": "data-analyst",
+      "condition": "需要经营指标、复盘洞察或增长归因",
+      "mandatory": false
+    },
+    {
+      "from": "program-manager",
+      "to": "content-strategist",
+      "condition": "需要对外沟通、内容包装与触达脚本",
+      "mandatory": false
+    },
+    {
+      "from": "engineering-lead",
+      "to": "quality-director",
+      "condition": "交付前执行质量门禁与放行判断",
+      "mandatory": true
+    }
+  ]
+}

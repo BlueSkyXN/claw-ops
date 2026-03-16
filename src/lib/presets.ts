@@ -126,7 +126,7 @@ export async function deployRole(
 
   // 总步骤: create(1) + update(1) + files(4) + skills(N)
   const skillCount = capabilities.requiredSkills.length
-  const totalSteps = 2 + 4 + skillCount
+  const totalSteps = 2 + 4 + skillCount + 1
   let step = 0
 
   const progress = (s: DeployProgress['step'], label: string) => {
@@ -136,7 +136,10 @@ export async function deployRole(
 
   // 1. 创建智能体
   progress('create', `创建智能体 ${manifest.name}...`)
-  const { agentId } = await api.createAgent({ name: manifest.name })
+  const { agentId } = await api.createAgent({
+    name: manifest.name,
+    workspace: `~/.openclaw/workspaces/${capabilities.oneClickDefaults.workspaceSuffix}`,
+  })
 
   // 后续步骤如果失败，回滚删除已创建的智能体
   try {

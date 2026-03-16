@@ -1,7 +1,12 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
+import { useNavigate } from 'react-router-dom'
 import { getAPI } from '../lib/api'
 import type { AgentSummary, GatewaySessionRow, SessionsUsageResult, ChannelsStatusResult } from '../types/openclaw'
+import type { MockExperienceSummary } from '../data/mock-workspace'
+import { importExperiencePreset } from '../lib/orchestration'
+import QuickStartBanner from '../components/QuickStartBanner'
+import OrchestratorHealthStrip from '../components/OrchestratorHealthStrip'
 
 // ==========================================
 // Tooltip
@@ -69,48 +74,72 @@ function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`animate-pulse bg-surface-hover rounded ${className}`} />
 }
 
+function isExperienceSummary(value: unknown): value is MockExperienceSummary {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Record<string, unknown>
+  return typeof candidate.templateId === 'string' && typeof candidate.name === 'string' && typeof candidate.layerCounts === 'object'
+}
+
 // ==========================================
 // Dashboard
 // ==========================================
 
 export default function Dashboard() {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [agents, setAgents] = useState<AgentSummary[]>([])
   const [sessions, setSessions] = useState<GatewaySessionRow[]>([])
   const [usage, setUsage] = useState<SessionsUsageResult | null>(null)
   const [channels, setChannels] = useState<ChannelsStatusResult | null>(null)
+  const [experience, setExperience] = useState<MockExperienceSummary | null>(null)
+  const [importingPreset, setImportingPreset] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const api = getAPI()
+      const [agentsRes, sessionsRes, usageRes, channelsRes, configRes] = await Promise.all([
+        api.getAgents(),
+        api.getSessions({ limit: 100, includeDerivedTitles: true, includeLastMessage: true }),
+        api.getSessionsUsage(),
+        api.getChannelsStatus(),
+        api.getConfig(),
+      ])
+      setAgents(agentsRes)
+      setSessions(sessionsRes.sessions)
+      setUsage(usageRes)
+      setChannels(channelsRes)
+      setExperience(isExperienceSummary(configRes.experience) ? configRes.experience : null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '数据加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-    async function loadData() {
-      setLoading(true)
-      setError(null)
-      try {
-        const api = getAPI()
-        const [agentsRes, sessionsRes, usageRes, channelsRes] = await Promise.all([
-          api.getAgents(),
-          api.getSessions({ limit: 100, includeDerivedTitles: true, includeLastMessage: true }),
-          api.getSessionsUsage(),
-          api.getChannelsStatus(),
-        ])
-        if (cancelled) return
-        setAgents(agentsRes)
-        setSessions(sessionsRes.sessions)
-        setUsage(usageRes)
-        setChannels(channelsRes)
-      } catch (err) {
-        if (cancelled) return
-        setError(err instanceof Error ? err.message : '数据加载失败')
-      } finally {
-        if (!cancelled) setLoading(false)
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
+
+  const handleQuickImport = useCallback(async () => {
+    let shouldReset = true
+    setImportingPreset(true)
+    try {
+      await importExperiencePreset('opc-super-assistant')
+      await loadData()
+      shouldReset = false
+      setImportingPreset(false)
+      navigate('/orchestration')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '导入 OPC 模板失败')
+    } finally {
+      if (shouldReset) {
+        setImportingPreset(false)
       }
     }
-
-    loadData()
-    return () => { cancelled = true }
-  }, [])
+  }, [loadData, navigate])
 
   // Derived data
   const connectedAccounts = useMemo(() => {
@@ -214,6 +243,16 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {!loading && experience === null && (
+        <QuickStartBanner
+          title="还没有激活团队编排？直接导入 OPC 超级助理"
+          description="一键拉起策略、产品、研发、内容、运维与复盘角色，并同步生成可体验的渠道、会话、日志和编排画布。"
+          busy={importingPreset}
+          onPreview={() => navigate('/orchestration')}
+          onImport={handleQuickImport}
+        />
+      )}
+
       {/* Stat cards */}
       <div className="grid grid-cols-4 gap-4">
         {statCards.map(s => (
@@ -233,6 +272,8 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      <OrchestratorHealthStrip experience={experience} />
 
       {/* Daily usage trend */}
       <div className="card p-5">

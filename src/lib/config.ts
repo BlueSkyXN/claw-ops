@@ -1,10 +1,10 @@
 // claw-ops 连接配置
-// 支持三种运行模式：standalone / demo / realtime
-// realtime 模式通过 WebSocket JSON-RPC 连接 OpenClaw Gateway
+// 支持两种运行模式：demo / realtime
+// demo 使用内置 Mock 数据，realtime 通过 WebSocket JSON-RPC 连接 OpenClaw Gateway
 
 import type { GatewayScope, AuthMode } from '../types/openclaw'
 
-export type AppMode = 'standalone' | 'demo' | 'realtime'
+export type AppMode = 'demo' | 'realtime'
 
 export interface OpenClawConfig {
   // 运行模式
@@ -21,7 +21,7 @@ export interface OpenClawConfig {
   scopes: GatewayScope[]
   // 数据刷新间隔 (秒，用于 mock 模式的模拟刷新)
   refreshInterval: number
-  // 兼容字段：standalone/demo → true, realtime → false
+  // 兼容字段：demo → true, realtime → false
   useMockData: boolean
   // 连接后由 gateway 报告的认证模式
   detectedAuthMode?: AuthMode
@@ -32,9 +32,11 @@ const STORAGE_KEY = 'claw-ops-config'
 function getEnvMode(): AppMode | null {
   try {
     const envMode = import.meta.env.VITE_APP_MODE as string | undefined
-    if (envMode === 'standalone' || envMode === 'demo' || envMode === 'realtime') {
+    if (envMode === 'demo' || envMode === 'realtime') {
       return envMode
     }
+    // 兼容旧配置：standalone 映射为 demo
+    if (envMode === 'standalone') return 'demo'
   } catch {
     // ignore
   }
@@ -42,7 +44,7 @@ function getEnvMode(): AppMode | null {
 }
 
 const DEFAULT_CONFIG: OpenClawConfig = {
-  mode: getEnvMode() ?? 'standalone',
+  mode: getEnvMode() ?? 'demo',
   gatewayUrl: 'ws://127.0.0.1:18789',
   authType: 'token',
   authToken: '',
@@ -54,6 +56,8 @@ const DEFAULT_CONFIG: OpenClawConfig = {
 
 function normalizeConfig(raw: Partial<OpenClawConfig>): OpenClawConfig {
   const config = { ...DEFAULT_CONFIG, ...raw }
+  // 兼容旧配置：standalone 映射为 demo
+  if ((config.mode as string) === 'standalone') config.mode = 'demo'
   config.useMockData = config.mode !== 'realtime'
   // 迁移旧 http URL 到 ws
   if (config.gatewayUrl.startsWith('http://')) {
@@ -112,7 +116,6 @@ export function isMockMode(config: OpenClawConfig): boolean {
 }
 
 export const MODE_LABELS: Record<AppMode, { name: string; icon: string; desc: string }> = {
-  standalone: { name: '独立开发', icon: '🖥️', desc: '纯 Web 看板，内置 Mock 数据' },
-  demo:       { name: '演示模式', icon: '🎭', desc: '完整 Mock 数据演示体验' },
+  demo:       { name: '演示模式', icon: '🎭', desc: '内置 Mock 数据，即刻体验全部功能' },
   realtime:   { name: '实时模式', icon: '🔗', desc: 'WebSocket 连接 OpenClaw Gateway' },
 }

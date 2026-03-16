@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_APP_MODE?: 'standalone' | 'demo' | 'realtime'
+  readonly VITE_APP_MODE?: 'demo' | 'realtime'
 }
 
 interface ImportMeta {

@@ -9,7 +9,7 @@ const navItems = [
   { path: '/channels', label: '渠道', icon: '📡' },
   { path: '/cron', label: '定时任务', icon: '⏰' },
   { path: '/usage', label: '用量分析', icon: '📈' },
-  { path: '/topology', label: '拓扑', icon: '🔗' },
+  { path: '/orchestration', label: '编排', icon: '🧩' },
   { path: '/logs', label: '日志', icon: '📜' },
 ]
 
@@ -20,7 +20,8 @@ const pageTitles: Record<string, string> = {
   '/channels': '渠道状态',
   '/cron': '定时任务',
   '/usage': '用量分析',
-  '/topology': '拓扑视图',
+  '/orchestration': '编排视图',
+  '/topology': '编排视图',
   '/logs': '运行日志',
 }
 
@@ -106,7 +107,7 @@ export default function Layout() {
             className="flex items-center gap-2 text-xs text-text-secondary hover:text-brand-500 transition-colors mb-2"
           >
             <span>🛠️</span>
-            <span>{config.mode === 'standalone' ? '模式设置' : '连接设置'}</span>
+            <span>{config.mode === 'demo' ? '模式设置' : '连接设置'}</span>
           </NavLink>
           <div className="flex items-center gap-2 text-xs text-text-secondary">
             <span className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />

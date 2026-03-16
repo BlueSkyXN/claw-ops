@@ -14,8 +14,7 @@ const STEPS: { key: Step; label: string; icon: string }[] = [
 ]
 
 const MODE_OPTIONS: { mode: AppMode; icon: string; title: string; desc: string; tag?: string }[] = [
-  { mode: 'standalone', icon: '🖥️', title: '独立 Web 开发', desc: '作为独立 Web 看板使用，不绑定 OpenClaw，使用内置数据驱动所有功能', tag: '推荐' },
-  { mode: 'demo', icon: '🎭', title: '演示体验', desc: '使用内置 Mock 数据体验完整功能，后续可随时切换为实时模式' },
+  { mode: 'demo', icon: '🎭', title: '演示体验', desc: '内置 Mock 数据驱动所有功能，即刻上手体验', tag: '推荐' },
   { mode: 'realtime', icon: '🔗', title: '实时对接', desc: '通过 WebSocket 连接 OpenClaw Gateway，获取真实智能体运行数据' },
 ]
 
@@ -393,9 +392,7 @@ export default function Setup() {
               <div>
                 <h2 className="text-xl font-semibold text-text-primary mb-2">配置完成！</h2>
                 <p className="text-text-secondary text-sm">
-                  {config.mode === 'standalone'
-                    ? '独立 Web 开发模式已激活。平台独立运行，不依赖 OpenClaw。'
-                    : config.mode === 'demo'
+                  {config.mode === 'demo'
                     ? '演示模式已激活，你可以体验全部功能。随时可在设置中切换为实时模式。'
                     : '实时模式已配置，数据将通过 WebSocket 从 OpenClaw Gateway 获取。'}
                 </p>

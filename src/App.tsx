@@ -6,7 +6,7 @@ import Sessions from './pages/Sessions'
 import Channels from './pages/Channels'
 import CronJobs from './pages/CronJobs'
 import Usage from './pages/Usage'
-import Topology from './pages/Topology'
+import Orchestration from './pages/Orchestration'
 import Logs from './pages/Logs'
 import Setup from './pages/Setup'
 
@@ -22,7 +22,8 @@ export default function App() {
         <Route path="/channels" element={<Channels />} />
         <Route path="/cron" element={<CronJobs />} />
         <Route path="/usage" element={<Usage />} />
-        <Route path="/topology" element={<Topology />} />
+        <Route path="/orchestration" element={<Orchestration />} />
+        <Route path="/topology" element={<Navigate to="/orchestration" replace />} />
         <Route path="/logs" element={<Logs />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
