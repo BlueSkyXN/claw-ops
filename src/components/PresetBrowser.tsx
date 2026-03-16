@@ -1,7 +1,7 @@
 // 预设角色浏览器
 // 展示预设库中所有角色（按四层组织），支持查看详情与一键导入
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { loadManifest, loadRoleDetail, deployRole } from '../lib/presets'
 import type { PresetLibraryManifest, PresetLayer } from '../types/presets'
 import type { PresetRoleDetail, DeployProgress } from '../lib/presets'
@@ -225,6 +225,14 @@ export default function PresetBrowser({ onImported }: { onImported: () => void }
   // 部署状态
   const [deploying, setDeploying] = useState(false)
   const [deployProgress, setDeployProgress] = useState<DeployProgress | null>(null)
+  const deployTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 清理定时器
+  useEffect(() => {
+    return () => {
+      if (deployTimerRef.current) clearTimeout(deployTimerRef.current)
+    }
+  }, [])
 
   // 加载清单
   useEffect(() => {
@@ -255,8 +263,8 @@ export default function PresetBrowser({ onImported }: { onImported: () => void }
     setDeployProgress(null)
     try {
       await deployRole(selectedRoleId, setDeployProgress)
-      // 部署成功
-      setTimeout(() => {
+      // 部署成功，短暂延迟后关闭弹窗
+      deployTimerRef.current = setTimeout(() => {
         setDeploying(false)
         setSelectedRoleId(null)
         setRoleDetail(null)

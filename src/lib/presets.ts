@@ -62,6 +62,12 @@ export function clearManifestCache(): void {
 // 角色详情加载
 // ==========================================
 
+/** 校验 fetch 响应状态 */
+function ensureOk(resp: Response, label: string): Response {
+  if (!resp.ok) throw new Error(`加载 ${label} 失败: HTTP ${resp.status}`)
+  return resp
+}
+
 /** 加载单个角色的完整数据 */
 export async function loadRoleDetail(roleId: string): Promise<PresetRoleDetail> {
   const manifest = await loadManifest()
@@ -71,11 +77,11 @@ export async function loadRoleDetail(roleId: string): Promise<PresetRoleDetail> 
   const basePath = `${PRESET_BASE}/roles/${roleId}`
 
   const [roleJson, capsJson, authJson, wfJson, soulText] = await Promise.all([
-    fetch(`${basePath}/role.json`).then(r => r.json()) as Promise<PresetRoleManifest>,
-    fetch(`${basePath}/capabilities.json`).then(r => r.json()) as Promise<PresetRoleCapabilities>,
-    fetch(`${basePath}/authority.json`).then(r => r.json()) as Promise<PresetRoleAuthority>,
-    fetch(`${basePath}/workflow.json`).then(r => r.json()) as Promise<PresetRoleWorkflow>,
-    fetch(`${basePath}/SOUL.md`).then(r => r.text()),
+    fetch(`${basePath}/role.json`).then(r => ensureOk(r, 'role.json').json()) as Promise<PresetRoleManifest>,
+    fetch(`${basePath}/capabilities.json`).then(r => ensureOk(r, 'capabilities.json').json()) as Promise<PresetRoleCapabilities>,
+    fetch(`${basePath}/authority.json`).then(r => ensureOk(r, 'authority.json').json()) as Promise<PresetRoleAuthority>,
+    fetch(`${basePath}/workflow.json`).then(r => ensureOk(r, 'workflow.json').json()) as Promise<PresetRoleWorkflow>,
+    fetch(`${basePath}/SOUL.md`).then(r => ensureOk(r, 'SOUL.md').text()),
   ])
 
   return {
@@ -128,35 +134,42 @@ export async function deployRole(
   progress('create', `创建智能体 ${manifest.name}...`)
   const { agentId } = await api.createAgent({ name: manifest.name })
 
-  // 2. 更新元数据 (emoji)
-  progress('update', '设置 emoji 与元数据...')
-  await api.updateAgent({ agentId, emoji: manifest.emoji })
+  // 后续步骤如果失败，回滚删除已创建的智能体
+  try {
+    // 2. 更新元数据 (emoji)
+    progress('update', '设置 emoji 与元数据...')
+    await api.updateAgent({ agentId, emoji: manifest.emoji })
 
-  // 3. 写入 SOUL.md
-  progress('soul', '写入 SOUL.md 人设文件...')
-  await api.agentFilesSet(agentId, 'SOUL.md', soulContent)
+    // 3. 写入 SOUL.md
+    progress('soul', '写入 SOUL.md 人设文件...')
+    await api.agentFilesSet(agentId, 'SOUL.md', soulContent)
 
-  // 4. 写入 workflow.json
-  progress('workflow', '写入工作流配置...')
-  await api.agentFilesSet(agentId, 'workflow.json', JSON.stringify(workflow, null, 2))
+    // 4. 写入 workflow.json
+    progress('workflow', '写入工作流配置...')
+    await api.agentFilesSet(agentId, 'workflow.json', JSON.stringify(workflow, null, 2))
 
-  // 5. 写入 authority.json
-  progress('authority', '写入权限矩阵...')
-  await api.agentFilesSet(agentId, 'authority.json', JSON.stringify(authority, null, 2))
+    // 5. 写入 authority.json
+    progress('authority', '写入权限矩阵...')
+    await api.agentFilesSet(agentId, 'authority.json', JSON.stringify(authority, null, 2))
 
-  // 6. 写入 capabilities.json
-  progress('capabilities', '写入能力配置...')
-  await api.agentFilesSet(agentId, 'capabilities.json', JSON.stringify(capabilities, null, 2))
+    // 6. 写入 capabilities.json
+    progress('capabilities', '写入能力配置...')
+    await api.agentFilesSet(agentId, 'capabilities.json', JSON.stringify(capabilities, null, 2))
 
-  // 7. 安装技能
-  for (const skillId of capabilities.requiredSkills) {
-    progress('skills', `安装技能: ${skillId}...`)
-    try {
-      await api.installSkill(skillId)
-    } catch {
-      // 技能安装失败不阻断流程，仅跳过
-      console.warn(`技能 ${skillId} 安装失败，已跳过`)
+    // 7. 安装技能
+    for (const skillId of capabilities.requiredSkills) {
+      progress('skills', `安装技能: ${skillId}...`)
+      try {
+        await api.installSkill(skillId)
+      } catch {
+        // 技能安装失败不阻断流程，仅跳过
+        console.warn(`技能 ${skillId} 安装失败，已跳过`)
+      }
     }
+  } catch (err) {
+    // 部署中途失败，回滚: 删除已创建的智能体
+    try { await api.deleteAgent({ agentId }) } catch { /* 回滚失败不抛出 */ }
+    throw err
   }
 
   progress('done', '部署完成！')
