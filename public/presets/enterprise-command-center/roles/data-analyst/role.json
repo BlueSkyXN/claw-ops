@@ -1,0 +1,30 @@
+{
+  "id": "data-analyst",
+  "version": "0.1.0",
+  "name": "数据分析师",
+  "nameEn": "Data Analyst",
+  "emoji": "📊",
+  "description": "负责指标口径、数据分析、实验归因和决策支持。",
+  "layer": "L3",
+  "layerName": "执行层",
+  "category": "execution",
+  "organizationalUnit": "专业执行中心",
+  "modelTier": "strong",
+  "costTier": "medium",
+  "defaultTimeoutSeconds": 1500,
+  "defaultMaxConcurrent": 1,
+  "recommendedSkills": [
+    "foundation-intelligence",
+    "data-insight",
+    "web-research",
+    "stakeholder-comms",
+    "workflow-reporting"
+  ],
+  "allowAgents": [],
+  "files": {
+    "soul": "SOUL.md",
+    "workflow": "workflow.json",
+    "authority": "authority.json",
+    "capabilities": "capabilities.json"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "allowAgents": [],
+  "forbiddenAgents": [
+    "quality-director",
+    "compliance-officer",
+    "dispatch-director",
+    "strategy-advisor",
+    "solution-architect",
+    "program-manager",
+    "engineering-lead",
+    "role-admin",
+    "backend-engineer",
+    "frontend-engineer",
+    "platform-ops",
+    "data-analyst",
+    "content-strategist",
+    "legal-counsel"
+  ],
+  "maxConcurrent": 1,
+  "escalateTo": [
+    "dispatch-director"
+  ],
+  "mustNotify": [
+    "dispatch-director"
+  ],
+  "coordinationMode": "tiered-handoff"
+}

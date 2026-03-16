@@ -1,0 +1,28 @@
+{
+  "tier": "L3",
+  "ownedStages": [
+    "implementation-frontend"
+  ],
+  "acceptsFrom": [
+    "engineering-lead",
+    "solution-architect"
+  ],
+  "handoffTo": [
+    "engineering-lead",
+    "quality-director"
+  ],
+  "mandatoryChecks": [
+    "交互一致性",
+    "状态正确性",
+    "可访问性",
+    "回归影响"
+  ],
+  "requiredArtifacts": [
+    "实现结果",
+    "界面说明",
+    "验证方式",
+    "风险说明"
+  ],
+  "successExit": "handoff-with-structured-summary",
+  "blockedExit": "raise-risk-and-request-decision"
+}

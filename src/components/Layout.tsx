@@ -35,6 +35,19 @@ export default function Layout() {
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [countdown, setCountdown] = useState(config.refreshInterval)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 清理刷新动画定时器
+  useEffect(() => {
+    return () => { if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current) }
+  }, [])
+
+  const triggerRefresh = () => {
+    setIsRefreshing(true)
+    setRefreshKey(k => k + 1)
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+    refreshTimerRef.current = setTimeout(() => setIsRefreshing(false), 600)
+  }
 
   useEffect(() => {
     if (!autoRefresh) {
@@ -44,9 +57,7 @@ export default function Layout() {
     const timer = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
-          setIsRefreshing(true)
-          setRefreshKey(k => k + 1)
-          setTimeout(() => setIsRefreshing(false), 600)
+          triggerRefresh()
           return config.refreshInterval
         }
         return prev - 1
@@ -125,11 +136,7 @@ export default function Layout() {
               {autoRefresh && <span className="font-mono ml-0.5">{countdown}s</span>}
             </button>
             <button
-              onClick={() => {
-                setIsRefreshing(true)
-                setRefreshKey((k) => k + 1)
-                setTimeout(() => setIsRefreshing(false), 600)
-              }}
+              onClick={triggerRefresh}
               className="btn-ghost flex items-center gap-1.5"
             >
               <svg className={`w-4 h-4 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

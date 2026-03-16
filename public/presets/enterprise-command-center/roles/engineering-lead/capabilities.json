@@ -1,0 +1,31 @@
+{
+  "modelTier": "strong",
+  "sandbox": {
+    "mode": "non-main",
+    "scope": "agent"
+  },
+  "costTier": "medium",
+  "timeoutSeconds": 1200,
+  "requiredSkills": [
+    "foundation-intelligence",
+    "delivery-engineering",
+    "quality-gate",
+    "github-delivery",
+    "workflow-reporting"
+  ],
+  "optionalSkills": [
+    "web-research",
+    "stakeholder-comms"
+  ],
+  "toolingProfile": [
+    "foundation-intelligence",
+    "delivery-engineering",
+    "quality-gate",
+    "github-delivery",
+    "workflow-reporting"
+  ],
+  "oneClickDefaults": {
+    "emoji": "🧑‍💻",
+    "workspaceSuffix": "engineering-lead"
+  }
+}

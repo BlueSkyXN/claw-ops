@@ -1,0 +1,31 @@
+{
+  "modelTier": "strong",
+  "sandbox": {
+    "mode": "all",
+    "scope": "agent"
+  },
+  "costTier": "medium",
+  "timeoutSeconds": 1800,
+  "requiredSkills": [
+    "foundation-intelligence",
+    "delivery-engineering",
+    "github-delivery",
+    "security-audit",
+    "workflow-reporting"
+  ],
+  "optionalSkills": [
+    "web-research",
+    "stakeholder-comms"
+  ],
+  "toolingProfile": [
+    "foundation-intelligence",
+    "delivery-engineering",
+    "github-delivery",
+    "security-audit",
+    "workflow-reporting"
+  ],
+  "oneClickDefaults": {
+    "emoji": "🛠️",
+    "workspaceSuffix": "backend-engineer"
+  }
+}

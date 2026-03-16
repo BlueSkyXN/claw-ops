@@ -1,0 +1,33 @@
+{
+  "tier": "L2",
+  "ownedStages": [
+    "role-intake",
+    "role-validation",
+    "role-promotion"
+  ],
+  "acceptsFrom": [
+    "dispatch-director",
+    "operator"
+  ],
+  "handoffTo": [
+    "quality-director",
+    "security-officer",
+    "compliance-officer",
+    "dispatch-director"
+  ],
+  "mandatoryChecks": [
+    "角色包结构",
+    "技能依赖",
+    "兼容性",
+    "基线测试",
+    "晋升记录"
+  ],
+  "requiredArtifacts": [
+    "校验结论",
+    "晋升建议",
+    "回滚方案",
+    "漂移事件"
+  ],
+  "successExit": "handoff-with-structured-summary",
+  "blockedExit": "raise-risk-and-request-decision"
+}

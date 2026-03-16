@@ -39,23 +39,27 @@ export interface DeployProgress {
 const PRESET_BASE = '/presets/enterprise-command-center'
 
 // ==========================================
-// 清单缓存
+// 清单缓存 (使用 Promise 消除并发请求的竞态条件)
 // ==========================================
 
-let manifestCache: PresetLibraryManifest | null = null
+let manifestPromise: Promise<PresetLibraryManifest> | null = null
 
-/** 加载预设库清单（带缓存） */
+/** 加载预设库清单（带缓存，并发安全） */
 export async function loadManifest(): Promise<PresetLibraryManifest> {
-  if (manifestCache) return manifestCache
-  const resp = await fetch(`${PRESET_BASE}/manifest.json`)
-  if (!resp.ok) throw new Error(`无法加载预设清单: ${resp.status}`)
-  manifestCache = await resp.json() as PresetLibraryManifest
-  return manifestCache
+  if (manifestPromise) return manifestPromise
+  manifestPromise = (async () => {
+    const resp = await fetch(`${PRESET_BASE}/manifest.json`)
+    if (!resp.ok) throw new Error(`无法加载预设清单: ${resp.status}`)
+    return await resp.json() as PresetLibraryManifest
+  })()
+  // 请求失败时清除缓存，允许下次重试
+  manifestPromise.catch(() => { manifestPromise = null })
+  return manifestPromise
 }
 
 /** 清除清单缓存（供刷新使用） */
 export function clearManifestCache(): void {
-  manifestCache = null
+  manifestPromise = null
 }
 
 // ==========================================

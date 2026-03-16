@@ -1,0 +1,46 @@
+{
+  "id": "governance-review-cell",
+  "name": "治理审查单元",
+  "nameEn": "Governance Review Cell",
+  "description": "聚焦质量、安全、合规与角色包治理的控制性模板。",
+  "roles": [
+    "dispatch-director",
+    "quality-director",
+    "security-officer",
+    "compliance-officer",
+    "role-admin",
+    "legal-counsel"
+  ],
+  "workflow": [
+    {
+      "from": "dispatch-director",
+      "to": "quality-director",
+      "condition": "常规质量复核",
+      "mandatory": true
+    },
+    {
+      "from": "dispatch-director",
+      "to": "security-officer",
+      "condition": "安全风险复核",
+      "mandatory": false
+    },
+    {
+      "from": "dispatch-director",
+      "to": "compliance-officer",
+      "condition": "合规风险复核",
+      "mandatory": false
+    },
+    {
+      "from": "dispatch-director",
+      "to": "role-admin",
+      "condition": "角色包变更治理",
+      "mandatory": false
+    },
+    {
+      "from": "compliance-officer",
+      "to": "legal-counsel",
+      "condition": "需要合同/知识产权细化意见",
+      "mandatory": false
+    }
+  ]
+}

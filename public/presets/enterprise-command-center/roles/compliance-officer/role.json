@@ -1,0 +1,29 @@
+{
+  "id": "compliance-officer",
+  "version": "0.1.0",
+  "name": "合规官",
+  "nameEn": "Compliance Officer",
+  "emoji": "⚖️",
+  "description": "负责许可证、隐私、法规和外部发布的合规审查。",
+  "layer": "L0",
+  "layerName": "治理层",
+  "category": "governance",
+  "organizationalUnit": "治理与审计中心",
+  "modelTier": "strong",
+  "costTier": "medium",
+  "defaultTimeoutSeconds": 1200,
+  "defaultMaxConcurrent": 1,
+  "recommendedSkills": [
+    "foundation-intelligence",
+    "compliance-review",
+    "workflow-reporting",
+    "stakeholder-comms"
+  ],
+  "allowAgents": [],
+  "files": {
+    "soul": "SOUL.md",
+    "workflow": "workflow.json",
+    "authority": "authority.json",
+    "capabilities": "capabilities.json"
+  }
+}

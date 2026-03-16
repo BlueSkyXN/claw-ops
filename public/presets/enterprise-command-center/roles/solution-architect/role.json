@@ -1,0 +1,36 @@
+{
+  "id": "solution-architect",
+  "version": "0.1.0",
+  "name": "解决方案架构师",
+  "nameEn": "Solution Architect",
+  "emoji": "🏗️",
+  "description": "负责技术方案设计、边界定义、依赖梳理和回滚策略。",
+  "layer": "L1",
+  "layerName": "决策层",
+  "category": "strategy",
+  "organizationalUnit": "策略与指挥中心",
+  "modelTier": "reasoning",
+  "costTier": "high",
+  "defaultTimeoutSeconds": 1500,
+  "defaultMaxConcurrent": 4,
+  "recommendedSkills": [
+    "foundation-intelligence",
+    "web-research",
+    "solution-planning",
+    "architecture-review",
+    "workflow-reporting"
+  ],
+  "allowAgents": [
+    "engineering-lead",
+    "backend-engineer",
+    "frontend-engineer",
+    "platform-ops",
+    "data-analyst"
+  ],
+  "files": {
+    "soul": "SOUL.md",
+    "workflow": "workflow.json",
+    "authority": "authority.json",
+    "capabilities": "capabilities.json"
+  }
+}

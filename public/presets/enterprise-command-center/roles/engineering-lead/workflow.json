@@ -1,0 +1,31 @@
+{
+  "tier": "L2",
+  "ownedStages": [
+    "technical-breakdown",
+    "implementation-review"
+  ],
+  "acceptsFrom": [
+    "solution-architect",
+    "program-manager"
+  ],
+  "handoffTo": [
+    "backend-engineer",
+    "frontend-engineer",
+    "platform-ops",
+    "quality-director"
+  ],
+  "mandatoryChecks": [
+    "技术拆解",
+    "接口约定",
+    "实现一致性",
+    "验证完整性"
+  ],
+  "requiredArtifacts": [
+    "子任务分配",
+    "实现约束",
+    "复核结论",
+    "风险说明"
+  ],
+  "successExit": "handoff-with-structured-summary",
+  "blockedExit": "raise-risk-and-request-decision"
+}

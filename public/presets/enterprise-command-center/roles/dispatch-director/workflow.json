@@ -1,0 +1,31 @@
+{
+  "tier": "L1",
+  "ownedStages": [
+    "intake",
+    "dispatch",
+    "escalation"
+  ],
+  "acceptsFrom": [
+    "operator",
+    "all-roles"
+  ],
+  "handoffTo": [
+    "strategy-advisor",
+    "program-manager",
+    "role-admin"
+  ],
+  "mandatoryChecks": [
+    "任务完整性",
+    "优先级",
+    "影响范围",
+    "是否需要治理层介入"
+  ],
+  "requiredArtifacts": [
+    "任务分类",
+    "下游路由",
+    "升级请求",
+    "阶段摘要"
+  ],
+  "successExit": "handoff-with-structured-summary",
+  "blockedExit": "raise-risk-and-request-decision"
+}

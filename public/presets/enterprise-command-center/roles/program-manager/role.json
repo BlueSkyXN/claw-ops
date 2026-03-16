@@ -1,0 +1,33 @@
+{
+  "id": "program-manager",
+  "version": "0.1.0",
+  "name": "项目经理",
+  "nameEn": "Program Manager",
+  "emoji": "📋",
+  "description": "负责里程碑、依赖、节奏和风险升级，确保工作按计划流动。",
+  "layer": "L2",
+  "layerName": "协调层",
+  "category": "coordination",
+  "organizationalUnit": "交付协调中心",
+  "modelTier": "strong",
+  "costTier": "medium",
+  "defaultTimeoutSeconds": 900,
+  "defaultMaxConcurrent": 5,
+  "recommendedSkills": [
+    "foundation-intelligence",
+    "project-governance",
+    "workflow-reporting",
+    "stakeholder-comms"
+  ],
+  "allowAgents": [
+    "engineering-lead",
+    "data-analyst",
+    "content-strategist"
+  ],
+  "files": {
+    "soul": "SOUL.md",
+    "workflow": "workflow.json",
+    "authority": "authority.json",
+    "capabilities": "capabilities.json"
+  }
+}

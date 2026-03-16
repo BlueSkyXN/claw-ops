@@ -1,0 +1,30 @@
+{
+  "tier": "L3",
+  "ownedStages": [
+    "content-plan",
+    "stakeholder-communication"
+  ],
+  "acceptsFrom": [
+    "strategy-advisor",
+    "program-manager",
+    "dispatch-director"
+  ],
+  "handoffTo": [
+    "dispatch-director",
+    "compliance-officer"
+  ],
+  "mandatoryChecks": [
+    "受众匹配",
+    "信息清晰度",
+    "风险表述",
+    "一致性"
+  ],
+  "requiredArtifacts": [
+    "内容摘要",
+    "沟通稿",
+    "FAQ 要点",
+    "发布建议"
+  ],
+  "successExit": "handoff-with-structured-summary",
+  "blockedExit": "raise-risk-and-request-decision"
+}

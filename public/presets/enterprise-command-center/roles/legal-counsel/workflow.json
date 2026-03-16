@@ -1,0 +1,30 @@
+{
+  "tier": "L3",
+  "ownedStages": [
+    "legal-review",
+    "contract-risk"
+  ],
+  "acceptsFrom": [
+    "strategy-advisor",
+    "compliance-officer",
+    "dispatch-director"
+  ],
+  "handoffTo": [
+    "compliance-officer",
+    "dispatch-director"
+  ],
+  "mandatoryChecks": [
+    "授权边界",
+    "条款义务",
+    "知识产权",
+    "数据与地域限制"
+  ],
+  "requiredArtifacts": [
+    "风险说明",
+    "建议措辞",
+    "禁止事项",
+    "需升级正式法务的部分"
+  ],
+  "successExit": "handoff-with-structured-summary",
+  "blockedExit": "raise-risk-and-request-decision"
+}

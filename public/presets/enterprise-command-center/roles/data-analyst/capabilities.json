@@ -1,0 +1,30 @@
+{
+  "modelTier": "strong",
+  "sandbox": {
+    "mode": "non-main",
+    "scope": "agent"
+  },
+  "costTier": "medium",
+  "timeoutSeconds": 1500,
+  "requiredSkills": [
+    "foundation-intelligence",
+    "data-insight",
+    "web-research",
+    "stakeholder-comms",
+    "workflow-reporting"
+  ],
+  "optionalSkills": [
+    "stakeholder-comms"
+  ],
+  "toolingProfile": [
+    "foundation-intelligence",
+    "data-insight",
+    "web-research",
+    "stakeholder-comms",
+    "workflow-reporting"
+  ],
+  "oneClickDefaults": {
+    "emoji": "📊",
+    "workspaceSuffix": "data-analyst"
+  }
+}

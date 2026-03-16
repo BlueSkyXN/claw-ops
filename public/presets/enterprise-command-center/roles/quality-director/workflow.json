@@ -1,0 +1,37 @@
+{
+  "tier": "L0",
+  "ownedStages": [
+    "quality-review",
+    "release-readiness"
+  ],
+  "acceptsFrom": [
+    "solution-architect",
+    "engineering-lead",
+    "backend-engineer",
+    "frontend-engineer",
+    "platform-ops",
+    "data-analyst",
+    "content-strategist",
+    "legal-counsel"
+  ],
+  "handoffTo": [
+    "dispatch-director",
+    "program-manager",
+    "engineering-lead"
+  ],
+  "mandatoryChecks": [
+    "正确性",
+    "可维护性",
+    "测试证据",
+    "性能边界",
+    "回滚可行性"
+  ],
+  "requiredArtifacts": [
+    "放行结论",
+    "问题分级",
+    "整改清单",
+    "复核条件"
+  ],
+  "successExit": "handoff-with-structured-summary",
+  "blockedExit": "raise-risk-and-request-decision"
+}

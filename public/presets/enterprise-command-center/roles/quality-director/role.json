@@ -1,0 +1,29 @@
+{
+  "id": "quality-director",
+  "version": "0.1.0",
+  "name": "质量总监",
+  "nameEn": "Quality Director",
+  "emoji": "🔎",
+  "description": "负责方案复核、质量门禁、交付验收与最终放行。",
+  "layer": "L0",
+  "layerName": "治理层",
+  "category": "governance",
+  "organizationalUnit": "治理与审计中心",
+  "modelTier": "strong",
+  "costTier": "high",
+  "defaultTimeoutSeconds": 1200,
+  "defaultMaxConcurrent": 1,
+  "recommendedSkills": [
+    "foundation-intelligence",
+    "quality-gate",
+    "workflow-reporting",
+    "stakeholder-comms"
+  ],
+  "allowAgents": [],
+  "files": {
+    "soul": "SOUL.md",
+    "workflow": "workflow.json",
+    "authority": "authority.json",
+    "capabilities": "capabilities.json"
+  }
+}

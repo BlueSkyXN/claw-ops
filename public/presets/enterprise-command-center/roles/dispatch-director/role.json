@@ -1,0 +1,37 @@
+{
+  "id": "dispatch-director",
+  "version": "0.1.0",
+  "name": "总调度官",
+  "nameEn": "Dispatch Director",
+  "emoji": "🎛️",
+  "description": "接收任务、完成分拣、决定流向并维护总调度视图。",
+  "layer": "L1",
+  "layerName": "决策层",
+  "category": "strategy",
+  "organizationalUnit": "策略与指挥中心",
+  "modelTier": "strong",
+  "costTier": "medium",
+  "defaultTimeoutSeconds": 900,
+  "defaultMaxConcurrent": 6,
+  "recommendedSkills": [
+    "foundation-intelligence",
+    "workflow-reporting",
+    "project-governance",
+    "stakeholder-comms"
+  ],
+  "allowAgents": [
+    "strategy-advisor",
+    "solution-architect",
+    "quality-director",
+    "security-officer",
+    "compliance-officer",
+    "program-manager",
+    "role-admin"
+  ],
+  "files": {
+    "soul": "SOUL.md",
+    "workflow": "workflow.json",
+    "authority": "authority.json",
+    "capabilities": "capabilities.json"
+  }
+}

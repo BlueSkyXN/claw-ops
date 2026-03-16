@@ -1,0 +1,31 @@
+{
+  "tier": "L3",
+  "ownedStages": [
+    "analysis",
+    "measurement"
+  ],
+  "acceptsFrom": [
+    "strategy-advisor",
+    "program-manager",
+    "solution-architect"
+  ],
+  "handoffTo": [
+    "strategy-advisor",
+    "program-manager",
+    "dispatch-director"
+  ],
+  "mandatoryChecks": [
+    "指标定义",
+    "样本口径",
+    "趋势解释",
+    "结论边界"
+  ],
+  "requiredArtifacts": [
+    "指标结论",
+    "图表摘要",
+    "假设与限制",
+    "建议动作"
+  ],
+  "successExit": "handoff-with-structured-summary",
+  "blockedExit": "raise-risk-and-request-decision"
+}

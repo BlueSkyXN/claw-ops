@@ -1,0 +1,33 @@
+{
+  "tier": "L0",
+  "ownedStages": [
+    "security-review",
+    "incident-block"
+  ],
+  "acceptsFrom": [
+    "solution-architect",
+    "engineering-lead",
+    "platform-ops",
+    "backend-engineer"
+  ],
+  "handoffTo": [
+    "dispatch-director",
+    "program-manager",
+    "quality-director"
+  ],
+  "mandatoryChecks": [
+    "认证授权",
+    "依赖安全",
+    "密钥管理",
+    "攻击面",
+    "日志与审计"
+  ],
+  "requiredArtifacts": [
+    "风险分级",
+    "阻断建议",
+    "缓解措施",
+    "复核条件"
+  ],
+  "successExit": "handoff-with-structured-summary",
+  "blockedExit": "raise-risk-and-request-decision"
+}

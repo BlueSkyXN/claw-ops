@@ -1,0 +1,97 @@
+{
+  "id": "full-enterprise-command-center",
+  "name": "企业级超级编排中心",
+  "nameEn": "Full Enterprise Command Center",
+  "description": "完整四层架构，适合需要治理、规划、交付和专业执行全链路的团队。",
+  "roles": [
+    "quality-director",
+    "security-officer",
+    "compliance-officer",
+    "dispatch-director",
+    "strategy-advisor",
+    "solution-architect",
+    "program-manager",
+    "engineering-lead",
+    "role-admin",
+    "backend-engineer",
+    "frontend-engineer",
+    "platform-ops",
+    "data-analyst",
+    "content-strategist",
+    "legal-counsel"
+  ],
+  "workflow": [
+    {
+      "from": "dispatch-director",
+      "to": "strategy-advisor",
+      "condition": "复杂或跨团队任务",
+      "mandatory": true
+    },
+    {
+      "from": "strategy-advisor",
+      "to": "solution-architect",
+      "condition": "涉及技术方案或系统设计",
+      "mandatory": true
+    },
+    {
+      "from": "solution-architect",
+      "to": "quality-director",
+      "condition": "方案或实现需要质量门禁",
+      "mandatory": true
+    },
+    {
+      "from": "solution-architect",
+      "to": "security-officer",
+      "condition": "涉及外部暴露或安全边界变化",
+      "mandatory": false
+    },
+    {
+      "from": "solution-architect",
+      "to": "compliance-officer",
+      "condition": "涉及隐私、许可证或外部发布",
+      "mandatory": false
+    },
+    {
+      "from": "dispatch-director",
+      "to": "program-manager",
+      "condition": "进入交付排期",
+      "mandatory": true
+    },
+    {
+      "from": "program-manager",
+      "to": "engineering-lead",
+      "condition": "需要工程执行",
+      "mandatory": true
+    },
+    {
+      "from": "engineering-lead",
+      "to": "backend-engineer",
+      "condition": "需要后端实现",
+      "mandatory": false
+    },
+    {
+      "from": "engineering-lead",
+      "to": "frontend-engineer",
+      "condition": "需要前端实现",
+      "mandatory": false
+    },
+    {
+      "from": "engineering-lead",
+      "to": "platform-ops",
+      "condition": "需要部署/环境/监控",
+      "mandatory": false
+    },
+    {
+      "from": "program-manager",
+      "to": "data-analyst",
+      "condition": "需要数据分析或指标复盘",
+      "mandatory": false
+    },
+    {
+      "from": "dispatch-director",
+      "to": "role-admin",
+      "condition": "涉及角色包导入/升级/治理",
+      "mandatory": false
+    }
+  ]
+}

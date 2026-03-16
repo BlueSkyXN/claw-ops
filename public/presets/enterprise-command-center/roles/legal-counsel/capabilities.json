@@ -1,0 +1,29 @@
+{
+  "modelTier": "strong",
+  "sandbox": {
+    "mode": "off"
+  },
+  "costTier": "medium",
+  "timeoutSeconds": 1200,
+  "requiredSkills": [
+    "foundation-intelligence",
+    "compliance-review",
+    "web-research",
+    "stakeholder-comms",
+    "workflow-reporting"
+  ],
+  "optionalSkills": [
+    "stakeholder-comms"
+  ],
+  "toolingProfile": [
+    "foundation-intelligence",
+    "compliance-review",
+    "web-research",
+    "stakeholder-comms",
+    "workflow-reporting"
+  ],
+  "oneClickDefaults": {
+    "emoji": "📚",
+    "workspaceSuffix": "legal-counsel"
+  }
+}

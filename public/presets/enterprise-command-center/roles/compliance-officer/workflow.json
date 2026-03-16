@@ -1,0 +1,31 @@
+{
+  "tier": "L0",
+  "ownedStages": [
+    "compliance-review",
+    "external-release-check"
+  ],
+  "acceptsFrom": [
+    "dispatch-director",
+    "strategy-advisor",
+    "content-strategist",
+    "legal-counsel"
+  ],
+  "handoffTo": [
+    "dispatch-director",
+    "program-manager"
+  ],
+  "mandatoryChecks": [
+    "许可证兼容",
+    "隐私边界",
+    "行业规范",
+    "对外表述风险"
+  ],
+  "requiredArtifacts": [
+    "合规结论",
+    "限制条件",
+    "必须补充资料",
+    "禁止事项"
+  ],
+  "successExit": "handoff-with-structured-summary",
+  "blockedExit": "raise-risk-and-request-decision"
+}

@@ -1,0 +1,35 @@
+{
+  "id": "strategy-advisor",
+  "version": "0.1.0",
+  "name": "策略顾问",
+  "nameEn": "Strategy Advisor",
+  "emoji": "🧭",
+  "description": "负责问题定义、选项对比、资源权衡和执行建议。",
+  "layer": "L1",
+  "layerName": "决策层",
+  "category": "strategy",
+  "organizationalUnit": "策略与指挥中心",
+  "modelTier": "reasoning",
+  "costTier": "high",
+  "defaultTimeoutSeconds": 1200,
+  "defaultMaxConcurrent": 4,
+  "recommendedSkills": [
+    "foundation-intelligence",
+    "web-research",
+    "solution-planning",
+    "data-insight",
+    "stakeholder-comms"
+  ],
+  "allowAgents": [
+    "solution-architect",
+    "data-analyst",
+    "legal-counsel",
+    "content-strategist"
+  ],
+  "files": {
+    "soul": "SOUL.md",
+    "workflow": "workflow.json",
+    "authority": "authority.json",
+    "capabilities": "capabilities.json"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "tier": "L2",
+  "ownedStages": [
+    "delivery-coordination",
+    "risk-tracking"
+  ],
+  "acceptsFrom": [
+    "dispatch-director",
+    "strategy-advisor",
+    "quality-director"
+  ],
+  "handoffTo": [
+    "engineering-lead",
+    "dispatch-director"
+  ],
+  "mandatoryChecks": [
+    "里程碑",
+    "责任分配",
+    "依赖阻塞",
+    "升级路径"
+  ],
+  "requiredArtifacts": [
+    "排期与分工",
+    "风险说明",
+    "升级请求",
+    "交付摘要"
+  ],
+  "successExit": "handoff-with-structured-summary",
+  "blockedExit": "raise-risk-and-request-decision"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "frontend-engineer",
+  "version": "0.1.0",
+  "name": "前端工程师",
+  "nameEn": "Frontend Engineer",
+  "emoji": "🖥️",
+  "description": "负责交互界面、状态管理、体验一致性与可视化落地。",
+  "layer": "L3",
+  "layerName": "执行层",
+  "category": "execution",
+  "organizationalUnit": "专业执行中心",
+  "modelTier": "strong",
+  "costTier": "medium",
+  "defaultTimeoutSeconds": 1800,
+  "defaultMaxConcurrent": 1,
+  "recommendedSkills": [
+    "foundation-intelligence",
+    "delivery-engineering",
+    "github-delivery",
+    "stakeholder-comms",
+    "workflow-reporting"
+  ],
+  "allowAgents": [],
+  "files": {
+    "soul": "SOUL.md",
+    "workflow": "workflow.json",
+    "authority": "authority.json",
+    "capabilities": "capabilities.json"
+  }
+}

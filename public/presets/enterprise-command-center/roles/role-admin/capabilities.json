@@ -1,0 +1,31 @@
+{
+  "modelTier": "strong",
+  "sandbox": {
+    "mode": "non-main",
+    "scope": "agent"
+  },
+  "costTier": "medium",
+  "timeoutSeconds": 1200,
+  "requiredSkills": [
+    "foundation-intelligence",
+    "role-lifecycle",
+    "project-governance",
+    "workflow-reporting",
+    "stakeholder-comms"
+  ],
+  "optionalSkills": [
+    "web-research",
+    "stakeholder-comms"
+  ],
+  "toolingProfile": [
+    "foundation-intelligence",
+    "role-lifecycle",
+    "project-governance",
+    "workflow-reporting",
+    "stakeholder-comms"
+  ],
+  "oneClickDefaults": {
+    "emoji": "🧩",
+    "workspaceSuffix": "role-admin"
+  }
+}

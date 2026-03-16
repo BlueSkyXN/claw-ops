@@ -1,7 +1,7 @@
 // CSV 数据导出工具
 
 export function exportToCSV(filename: string, headers: string[], rows: string[][]): void {
-  // Add BOM for Chinese character support in Excel
+  // BOM 确保 Excel 正确识别中文编码
   const BOM = '\uFEFF'
   const csvContent = [
     headers.join(','),
@@ -10,11 +10,15 @@ export function exportToCSV(filename: string, headers: string[], rows: string[][
 
   const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
+  try {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+  } finally {
+    // 无论下载是否成功，始终释放 ObjectURL 避免内存泄漏
+    URL.revokeObjectURL(url)
+  }
 }
 
 // Export specific data types

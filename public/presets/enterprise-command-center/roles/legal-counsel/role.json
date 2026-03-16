@@ -1,0 +1,30 @@
+{
+  "id": "legal-counsel",
+  "version": "0.1.0",
+  "name": "法务顾问",
+  "nameEn": "Legal Counsel",
+  "emoji": "📚",
+  "description": "负责合同条款、知识产权、隐私边界和法律风险说明。",
+  "layer": "L3",
+  "layerName": "执行层",
+  "category": "execution",
+  "organizationalUnit": "专业执行中心",
+  "modelTier": "strong",
+  "costTier": "medium",
+  "defaultTimeoutSeconds": 1200,
+  "defaultMaxConcurrent": 1,
+  "recommendedSkills": [
+    "foundation-intelligence",
+    "compliance-review",
+    "web-research",
+    "stakeholder-comms",
+    "workflow-reporting"
+  ],
+  "allowAgents": [],
+  "files": {
+    "soul": "SOUL.md",
+    "workflow": "workflow.json",
+    "authority": "authority.json",
+    "capabilities": "capabilities.json"
+  }
+}

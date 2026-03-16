@@ -1,0 +1,13 @@
+{
+  "version": "0.1.0",
+  "packs": [
+    {
+      "id": "enterprise-command-center",
+      "name": "企业级超级编排中心",
+      "nameEn": "Enterprise Command Center",
+      "description": "四层企业级角色库，覆盖治理、决策、协调、执行与团队模板。",
+      "version": "0.1.0",
+      "path": "enterprise-command-center/manifest.json"
+    }
+  ]
+}

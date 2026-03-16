@@ -1,0 +1,29 @@
+{
+  "id": "security-officer",
+  "version": "0.1.0",
+  "name": "安全官",
+  "nameEn": "Security Officer",
+  "emoji": "🛡️",
+  "description": "负责安全审计、风险阻断、敏感变更把关和事故升级。",
+  "layer": "L0",
+  "layerName": "治理层",
+  "category": "governance",
+  "organizationalUnit": "治理与审计中心",
+  "modelTier": "strong",
+  "costTier": "high",
+  "defaultTimeoutSeconds": 1200,
+  "defaultMaxConcurrent": 1,
+  "recommendedSkills": [
+    "foundation-intelligence",
+    "security-audit",
+    "workflow-reporting",
+    "stakeholder-comms"
+  ],
+  "allowAgents": [],
+  "files": {
+    "soul": "SOUL.md",
+    "workflow": "workflow.json",
+    "authority": "authority.json",
+    "capabilities": "capabilities.json"
+  }
+}

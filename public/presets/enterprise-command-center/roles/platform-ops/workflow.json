@@ -1,0 +1,32 @@
+{
+  "tier": "L3",
+  "ownedStages": [
+    "implementation-platform",
+    "release-ops",
+    "incident-response"
+  ],
+  "acceptsFrom": [
+    "engineering-lead",
+    "solution-architect",
+    "security-officer"
+  ],
+  "handoffTo": [
+    "engineering-lead",
+    "quality-director",
+    "dispatch-director"
+  ],
+  "mandatoryChecks": [
+    "部署路径",
+    "监控信号",
+    "回滚能力",
+    "密钥与配置"
+  ],
+  "requiredArtifacts": [
+    "部署结果",
+    "运行状态",
+    "回滚建议",
+    "风险告警"
+  ],
+  "successExit": "handoff-with-structured-summary",
+  "blockedExit": "raise-risk-and-request-decision"
+}

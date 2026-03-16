@@ -1,0 +1,29 @@
+{
+  "modelTier": "reasoning",
+  "sandbox": {
+    "mode": "off"
+  },
+  "costTier": "high",
+  "timeoutSeconds": 1200,
+  "requiredSkills": [
+    "foundation-intelligence",
+    "web-research",
+    "solution-planning",
+    "data-insight",
+    "stakeholder-comms"
+  ],
+  "optionalSkills": [
+    "stakeholder-comms"
+  ],
+  "toolingProfile": [
+    "foundation-intelligence",
+    "web-research",
+    "solution-planning",
+    "data-insight",
+    "stakeholder-comms"
+  ],
+  "oneClickDefaults": {
+    "emoji": "🧭",
+    "workspaceSuffix": "strategy-advisor"
+  }
+}

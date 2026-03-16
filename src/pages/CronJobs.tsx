@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { getAPI } from '../lib/api'
 import type { CronJob, CronRunLogEntry, CronSchedule, CronPayload } from '../types/openclaw'
 
@@ -329,6 +329,12 @@ export default function CronJobs() {
   const [loading, setLoading] = useState(true)
   const [expandedJob, setExpandedJob] = useState<string | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
+  const runNowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 组件卸载时清理 handleRunNow 延时定时器
+  useEffect(() => {
+    return () => { if (runNowTimerRef.current) clearTimeout(runNowTimerRef.current) }
+  }, [])
 
   const loadData = async () => {
     setLoading(true)
@@ -367,7 +373,8 @@ export default function CronJobs() {
   const handleRunNow = async (job: CronJob) => {
     try {
       await getAPI().runCronJob({ id: job.id })
-      setTimeout(loadData, 1000)
+      if (runNowTimerRef.current) clearTimeout(runNowTimerRef.current)
+      runNowTimerRef.current = setTimeout(loadData, 1000)
     } catch (e) { console.error(e) }
   }
 

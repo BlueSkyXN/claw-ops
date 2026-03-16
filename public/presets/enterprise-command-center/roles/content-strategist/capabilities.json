@@ -1,0 +1,29 @@
+{
+  "modelTier": "strong",
+  "sandbox": {
+    "mode": "off"
+  },
+  "costTier": "medium",
+  "timeoutSeconds": 1200,
+  "requiredSkills": [
+    "foundation-intelligence",
+    "stakeholder-comms",
+    "web-research",
+    "data-insight",
+    "compliance-review"
+  ],
+  "optionalSkills": [
+    "stakeholder-comms"
+  ],
+  "toolingProfile": [
+    "foundation-intelligence",
+    "stakeholder-comms",
+    "web-research",
+    "data-insight",
+    "compliance-review"
+  ],
+  "oneClickDefaults": {
+    "emoji": "📝",
+    "workspaceSuffix": "content-strategist"
+  }
+}

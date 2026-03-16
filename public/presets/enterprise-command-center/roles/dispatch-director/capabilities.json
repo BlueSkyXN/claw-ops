@@ -1,0 +1,28 @@
+{
+  "modelTier": "strong",
+  "sandbox": {
+    "mode": "off"
+  },
+  "costTier": "medium",
+  "timeoutSeconds": 900,
+  "requiredSkills": [
+    "foundation-intelligence",
+    "workflow-reporting",
+    "project-governance",
+    "stakeholder-comms"
+  ],
+  "optionalSkills": [
+    "web-research",
+    "stakeholder-comms"
+  ],
+  "toolingProfile": [
+    "foundation-intelligence",
+    "workflow-reporting",
+    "project-governance",
+    "stakeholder-comms"
+  ],
+  "oneClickDefaults": {
+    "emoji": "🎛️",
+    "workspaceSuffix": "dispatch-director"
+  }
+}

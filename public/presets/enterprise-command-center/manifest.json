@@ -1,0 +1,283 @@
+{
+  "id": "enterprise-command-center",
+  "name": "企业级超级编排中心",
+  "nameEn": "Enterprise Command Center",
+  "version": "0.1.0",
+  "description": "面向 OpenClaw 的企业级预设角色库，强调角色即契约、技能可复用、流程可治理。",
+  "designPrinciples": [
+    "role-as-contract",
+    "prompt-and-workflow-separation",
+    "tiered-authority",
+    "skill-reuse-over-role-bloat",
+    "governance-before-delivery"
+  ],
+  "organization": {
+    "model": "four-layer-enterprise",
+    "layers": [
+      {
+        "id": "L0",
+        "name": "治理层",
+        "nameEn": "Governance",
+        "organizationalUnit": "治理与审计中心"
+      },
+      {
+        "id": "L1",
+        "name": "决策层",
+        "nameEn": "Strategy",
+        "organizationalUnit": "策略与指挥中心"
+      },
+      {
+        "id": "L2",
+        "name": "协调层",
+        "nameEn": "Coordination",
+        "organizationalUnit": "交付协调中心"
+      },
+      {
+        "id": "L3",
+        "name": "执行层",
+        "nameEn": "Execution",
+        "organizationalUnit": "专业执行中心"
+      }
+    ]
+  },
+  "requiresGatewayMethods": [
+    "agents.create",
+    "agents.update",
+    "agents.files.set",
+    "skills.install"
+  ],
+  "roles": [
+    {
+      "id": "quality-director",
+      "name": "质量总监",
+      "nameEn": "Quality Director",
+      "layer": "L0",
+      "category": "governance",
+      "path": "roles/quality-director/role.json"
+    },
+    {
+      "id": "security-officer",
+      "name": "安全官",
+      "nameEn": "Security Officer",
+      "layer": "L0",
+      "category": "governance",
+      "path": "roles/security-officer/role.json"
+    },
+    {
+      "id": "compliance-officer",
+      "name": "合规官",
+      "nameEn": "Compliance Officer",
+      "layer": "L0",
+      "category": "governance",
+      "path": "roles/compliance-officer/role.json"
+    },
+    {
+      "id": "dispatch-director",
+      "name": "总调度官",
+      "nameEn": "Dispatch Director",
+      "layer": "L1",
+      "category": "strategy",
+      "path": "roles/dispatch-director/role.json"
+    },
+    {
+      "id": "strategy-advisor",
+      "name": "策略顾问",
+      "nameEn": "Strategy Advisor",
+      "layer": "L1",
+      "category": "strategy",
+      "path": "roles/strategy-advisor/role.json"
+    },
+    {
+      "id": "solution-architect",
+      "name": "解决方案架构师",
+      "nameEn": "Solution Architect",
+      "layer": "L1",
+      "category": "strategy",
+      "path": "roles/solution-architect/role.json"
+    },
+    {
+      "id": "program-manager",
+      "name": "项目经理",
+      "nameEn": "Program Manager",
+      "layer": "L2",
+      "category": "coordination",
+      "path": "roles/program-manager/role.json"
+    },
+    {
+      "id": "engineering-lead",
+      "name": "技术负责人",
+      "nameEn": "Engineering Lead",
+      "layer": "L2",
+      "category": "coordination",
+      "path": "roles/engineering-lead/role.json"
+    },
+    {
+      "id": "role-admin",
+      "name": "角色治理官",
+      "nameEn": "Role Admin",
+      "layer": "L2",
+      "category": "coordination",
+      "path": "roles/role-admin/role.json"
+    },
+    {
+      "id": "backend-engineer",
+      "name": "后端工程师",
+      "nameEn": "Backend Engineer",
+      "layer": "L3",
+      "category": "execution",
+      "path": "roles/backend-engineer/role.json"
+    },
+    {
+      "id": "frontend-engineer",
+      "name": "前端工程师",
+      "nameEn": "Frontend Engineer",
+      "layer": "L3",
+      "category": "execution",
+      "path": "roles/frontend-engineer/role.json"
+    },
+    {
+      "id": "platform-ops",
+      "name": "平台运维工程师",
+      "nameEn": "Platform Ops",
+      "layer": "L3",
+      "category": "execution",
+      "path": "roles/platform-ops/role.json"
+    },
+    {
+      "id": "data-analyst",
+      "name": "数据分析师",
+      "nameEn": "Data Analyst",
+      "layer": "L3",
+      "category": "execution",
+      "path": "roles/data-analyst/role.json"
+    },
+    {
+      "id": "content-strategist",
+      "name": "内容策略师",
+      "nameEn": "Content Strategist",
+      "layer": "L3",
+      "category": "execution",
+      "path": "roles/content-strategist/role.json"
+    },
+    {
+      "id": "legal-counsel",
+      "name": "法务顾问",
+      "nameEn": "Legal Counsel",
+      "layer": "L3",
+      "category": "execution",
+      "path": "roles/legal-counsel/role.json"
+    }
+  ],
+  "skills": [
+    {
+      "id": "foundation-intelligence",
+      "name": "基础智能包",
+      "version": "0.1.0",
+      "path": "skills/foundation-intelligence/SKILL.md"
+    },
+    {
+      "id": "workflow-reporting",
+      "name": "流程汇报",
+      "version": "0.1.0",
+      "path": "skills/workflow-reporting/SKILL.md"
+    },
+    {
+      "id": "web-research",
+      "name": "网页研究",
+      "version": "0.1.0",
+      "path": "skills/web-research/SKILL.md"
+    },
+    {
+      "id": "solution-planning",
+      "name": "方案规划",
+      "version": "0.1.0",
+      "path": "skills/solution-planning/SKILL.md"
+    },
+    {
+      "id": "architecture-review",
+      "name": "架构评审",
+      "version": "0.1.0",
+      "path": "skills/architecture-review/SKILL.md"
+    },
+    {
+      "id": "quality-gate",
+      "name": "质量门禁",
+      "version": "0.1.0",
+      "path": "skills/quality-gate/SKILL.md"
+    },
+    {
+      "id": "security-audit",
+      "name": "安全审计",
+      "version": "0.1.0",
+      "path": "skills/security-audit/SKILL.md"
+    },
+    {
+      "id": "compliance-review",
+      "name": "合规审查",
+      "version": "0.1.0",
+      "path": "skills/compliance-review/SKILL.md"
+    },
+    {
+      "id": "project-governance",
+      "name": "项目治理",
+      "version": "0.1.0",
+      "path": "skills/project-governance/SKILL.md"
+    },
+    {
+      "id": "github-delivery",
+      "name": "GitHub交付",
+      "version": "0.1.0",
+      "path": "skills/github-delivery/SKILL.md"
+    },
+    {
+      "id": "delivery-engineering",
+      "name": "交付工程",
+      "version": "0.1.0",
+      "path": "skills/delivery-engineering/SKILL.md"
+    },
+    {
+      "id": "observability-ops",
+      "name": "可观测运维",
+      "version": "0.1.0",
+      "path": "skills/observability-ops/SKILL.md"
+    },
+    {
+      "id": "data-insight",
+      "name": "数据洞察",
+      "version": "0.1.0",
+      "path": "skills/data-insight/SKILL.md"
+    },
+    {
+      "id": "stakeholder-comms",
+      "name": "利益相关方沟通",
+      "version": "0.1.0",
+      "path": "skills/stakeholder-comms/SKILL.md"
+    },
+    {
+      "id": "role-lifecycle",
+      "name": "角色生命周期治理",
+      "version": "0.1.0",
+      "path": "skills/role-lifecycle/SKILL.md"
+    }
+  ],
+  "teamTemplates": [
+    {
+      "id": "full-enterprise-command-center",
+      "name": "企业级超级编排中心",
+      "nameEn": "Full Enterprise Command Center",
+      "path": "teams/full-enterprise-command-center.json"
+    },
+    {
+      "id": "product-delivery-squad",
+      "name": "产品交付战队",
+      "nameEn": "Product Delivery Squad",
+      "path": "teams/product-delivery-squad.json"
+    },
+    {
+      "id": "governance-review-cell",
+      "name": "治理审查单元",
+      "nameEn": "Governance Review Cell",
+      "path": "teams/governance-review-cell.json"
+    }
+  ]
+}

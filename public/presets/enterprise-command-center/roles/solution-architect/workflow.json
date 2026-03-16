@@ -1,0 +1,32 @@
+{
+  "tier": "L1",
+  "ownedStages": [
+    "architecture-review",
+    "delivery-design"
+  ],
+  "acceptsFrom": [
+    "strategy-advisor",
+    "dispatch-director"
+  ],
+  "handoffTo": [
+    "quality-director",
+    "security-officer",
+    "program-manager",
+    "engineering-lead"
+  ],
+  "mandatoryChecks": [
+    "架构边界",
+    "系统依赖",
+    "扩展性",
+    "回滚路径",
+    "运维可行性"
+  ],
+  "requiredArtifacts": [
+    "架构方案",
+    "组件边界",
+    "关键决策",
+    "回滚方案"
+  ],
+  "successExit": "handoff-with-structured-summary",
+  "blockedExit": "raise-risk-and-request-decision"
+}

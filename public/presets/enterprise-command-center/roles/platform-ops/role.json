@@ -1,0 +1,30 @@
+{
+  "id": "platform-ops",
+  "version": "0.1.0",
+  "name": "平台运维工程师",
+  "nameEn": "Platform Ops",
+  "emoji": "🚦",
+  "description": "负责部署、环境、监控、回滚和故障处理。",
+  "layer": "L3",
+  "layerName": "执行层",
+  "category": "execution",
+  "organizationalUnit": "专业执行中心",
+  "modelTier": "strong",
+  "costTier": "medium",
+  "defaultTimeoutSeconds": 1800,
+  "defaultMaxConcurrent": 1,
+  "recommendedSkills": [
+    "foundation-intelligence",
+    "observability-ops",
+    "github-delivery",
+    "security-audit",
+    "workflow-reporting"
+  ],
+  "allowAgents": [],
+  "files": {
+    "soul": "SOUL.md",
+    "workflow": "workflow.json",
+    "authority": "authority.json",
+    "capabilities": "capabilities.json"
+  }
+}

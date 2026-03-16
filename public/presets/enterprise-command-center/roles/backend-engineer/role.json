@@ -1,0 +1,30 @@
+{
+  "id": "backend-engineer",
+  "version": "0.1.0",
+  "name": "后端工程师",
+  "nameEn": "Backend Engineer",
+  "emoji": "🛠️",
+  "description": "负责后端服务、接口、数据访问层和业务逻辑实现。",
+  "layer": "L3",
+  "layerName": "执行层",
+  "category": "execution",
+  "organizationalUnit": "专业执行中心",
+  "modelTier": "strong",
+  "costTier": "medium",
+  "defaultTimeoutSeconds": 1800,
+  "defaultMaxConcurrent": 1,
+  "recommendedSkills": [
+    "foundation-intelligence",
+    "delivery-engineering",
+    "github-delivery",
+    "security-audit",
+    "workflow-reporting"
+  ],
+  "allowAgents": [],
+  "files": {
+    "soul": "SOUL.md",
+    "workflow": "workflow.json",
+    "authority": "authority.json",
+    "capabilities": "capabilities.json"
+  }
+}

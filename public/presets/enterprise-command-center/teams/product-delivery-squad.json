@@ -1,0 +1,69 @@
+{
+  "id": "product-delivery-squad",
+  "name": "产品交付战队",
+  "nameEn": "Product Delivery Squad",
+  "description": "面向产品/研发交付的一线模板，保留质量与安全门禁。",
+  "roles": [
+    "dispatch-director",
+    "strategy-advisor",
+    "solution-architect",
+    "quality-director",
+    "security-officer",
+    "program-manager",
+    "engineering-lead",
+    "backend-engineer",
+    "frontend-engineer",
+    "platform-ops",
+    "data-analyst"
+  ],
+  "workflow": [
+    {
+      "from": "dispatch-director",
+      "to": "strategy-advisor",
+      "condition": "复杂需求分解",
+      "mandatory": true
+    },
+    {
+      "from": "strategy-advisor",
+      "to": "solution-architect",
+      "condition": "方案设计",
+      "mandatory": true
+    },
+    {
+      "from": "solution-architect",
+      "to": "engineering-lead",
+      "condition": "进入交付设计",
+      "mandatory": true
+    },
+    {
+      "from": "engineering-lead",
+      "to": "backend-engineer",
+      "condition": "后端任务",
+      "mandatory": false
+    },
+    {
+      "from": "engineering-lead",
+      "to": "frontend-engineer",
+      "condition": "前端任务",
+      "mandatory": false
+    },
+    {
+      "from": "engineering-lead",
+      "to": "platform-ops",
+      "condition": "部署与环境任务",
+      "mandatory": false
+    },
+    {
+      "from": "engineering-lead",
+      "to": "quality-director",
+      "condition": "交付放行",
+      "mandatory": true
+    },
+    {
+      "from": "engineering-lead",
+      "to": "security-officer",
+      "condition": "安全敏感变更",
+      "mandatory": false
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "modelTier": "reasoning",
+  "sandbox": {
+    "mode": "non-main",
+    "scope": "agent"
+  },
+  "costTier": "high",
+  "timeoutSeconds": 1500,
+  "requiredSkills": [
+    "foundation-intelligence",
+    "web-research",
+    "solution-planning",
+    "architecture-review",
+    "workflow-reporting"
+  ],
+  "optionalSkills": [
+    "stakeholder-comms"
+  ],
+  "toolingProfile": [
+    "foundation-intelligence",
+    "web-research",
+    "solution-planning",
+    "architecture-review",
+    "workflow-reporting"
+  ],
+  "oneClickDefaults": {
+    "emoji": "🏗️",
+    "workspaceSuffix": "solution-architect"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "id": "engineering-lead",
+  "version": "0.1.0",
+  "name": "技术负责人",
+  "nameEn": "Engineering Lead",
+  "emoji": "🧑‍💻",
+  "description": "负责技术拆解、任务分配、工程标准和实现复核。",
+  "layer": "L2",
+  "layerName": "协调层",
+  "category": "coordination",
+  "organizationalUnit": "交付协调中心",
+  "modelTier": "strong",
+  "costTier": "medium",
+  "defaultTimeoutSeconds": 1200,
+  "defaultMaxConcurrent": 4,
+  "recommendedSkills": [
+    "foundation-intelligence",
+    "delivery-engineering",
+    "quality-gate",
+    "github-delivery",
+    "workflow-reporting"
+  ],
+  "allowAgents": [
+    "backend-engineer",
+    "frontend-engineer",
+    "platform-ops"
+  ],
+  "files": {
+    "soul": "SOUL.md",
+    "workflow": "workflow.json",
+    "authority": "authority.json",
+    "capabilities": "capabilities.json"
+  }
+}

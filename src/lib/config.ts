@@ -78,11 +78,20 @@ export function loadConfig(): OpenClawConfig {
 
 export function saveConfig(config: OpenClawConfig): void {
   config.useMockData = config.mode !== 'realtime'
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
+  } catch {
+    // localStorage 可能在隐私模式或存储满时抛出异常
+    console.warn('Failed to save config to localStorage')
+  }
 }
 
 export function clearConfig(): void {
-  localStorage.removeItem(STORAGE_KEY)
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // localStorage 可能不可用
+  }
 }
 
 export function isConfigured(): boolean {

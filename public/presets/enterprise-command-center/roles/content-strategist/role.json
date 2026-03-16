@@ -1,0 +1,30 @@
+{
+  "id": "content-strategist",
+  "version": "0.1.0",
+  "name": "内容策略师",
+  "nameEn": "Content Strategist",
+  "emoji": "📝",
+  "description": "负责对内外沟通内容、叙事结构和发布素材的策划与产出。",
+  "layer": "L3",
+  "layerName": "执行层",
+  "category": "execution",
+  "organizationalUnit": "专业执行中心",
+  "modelTier": "strong",
+  "costTier": "medium",
+  "defaultTimeoutSeconds": 1200,
+  "defaultMaxConcurrent": 1,
+  "recommendedSkills": [
+    "foundation-intelligence",
+    "stakeholder-comms",
+    "web-research",
+    "data-insight",
+    "compliance-review"
+  ],
+  "allowAgents": [],
+  "files": {
+    "soul": "SOUL.md",
+    "workflow": "workflow.json",
+    "authority": "authority.json",
+    "capabilities": "capabilities.json"
+  }
+}

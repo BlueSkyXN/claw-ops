@@ -1,0 +1,29 @@
+{
+  "modelTier": "strong",
+  "sandbox": {
+    "mode": "all",
+    "scope": "agent"
+  },
+  "costTier": "high",
+  "timeoutSeconds": 1200,
+  "requiredSkills": [
+    "foundation-intelligence",
+    "quality-gate",
+    "workflow-reporting",
+    "stakeholder-comms"
+  ],
+  "optionalSkills": [
+    "web-research",
+    "stakeholder-comms"
+  ],
+  "toolingProfile": [
+    "foundation-intelligence",
+    "quality-gate",
+    "workflow-reporting",
+    "stakeholder-comms"
+  ],
+  "oneClickDefaults": {
+    "emoji": "🔎",
+    "workspaceSuffix": "quality-director"
+  }
+}

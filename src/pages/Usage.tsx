@@ -4,7 +4,7 @@ import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import { getAPI } from '../lib/api'
-import type { SessionsUsageResult, DailyUsage } from '../types/openclaw'
+import type { SessionsUsageResult, DailyUsage, SessionsUsageParams } from '../types/openclaw'
 
 const CHART_COLORS = ['#6366f1', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#ec4899']
 
@@ -28,10 +28,10 @@ export default function Usage() {
   const fetchUsage = async () => {
     setLoading(true)
     try {
-      const params: Record<string, string> = {}
+      const params: SessionsUsageParams = {}
       if (startDate) params.startDate = startDate
       if (endDate) params.endDate = endDate
-      const result = await getAPI().getSessionsUsage(params as never)
+      const result = await getAPI().getSessionsUsage(params)
       setData(result)
     } catch (err) {
       console.error('Failed to fetch usage:', err)

@@ -1,0 +1,29 @@
+{
+  "tier": "L1",
+  "ownedStages": [
+    "problem-framing",
+    "option-analysis"
+  ],
+  "acceptsFrom": [
+    "dispatch-director"
+  ],
+  "handoffTo": [
+    "solution-architect",
+    "program-manager",
+    "dispatch-director"
+  ],
+  "mandatoryChecks": [
+    "目标清晰度",
+    "方案选项",
+    "成本收益",
+    "风险暴露"
+  ],
+  "requiredArtifacts": [
+    "推荐方案",
+    "备选方案",
+    "决策依据",
+    "关键风险"
+  ],
+  "successExit": "handoff-with-structured-summary",
+  "blockedExit": "raise-risk-and-request-decision"
+}
