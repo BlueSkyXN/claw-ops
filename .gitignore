@@ -1,0 +1,27 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+
+# 工作区产物 (截图/临时文件/笔记)
+local/
+docs/*.png
+docs/*.jpg
+
+# 编译产物
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# AI 辅助配置 (个人工作区)
+CLAUDE.md
+AGENTS.md

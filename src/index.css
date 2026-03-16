@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-surface-bg text-text-primary antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-surface-border rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-text-muted rounded-full; }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface-card border border-surface-border rounded-2xl shadow-card;
+  }
+  .card-hover {
+    @apply card transition-all duration-200 hover:shadow-card-hover hover:border-brand-200;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  .badge-blue { @apply bg-pastel-blue/30 text-accent-blue; }
+  .badge-green { @apply bg-pastel-green/30 text-accent-green; }
+  .badge-yellow { @apply bg-pastel-yellow/30 text-accent-yellow; }
+  .badge-red { @apply bg-pastel-red/30 text-accent-red; }
+  .badge-purple { @apply bg-pastel-purple/30 text-accent-purple; }
+  .badge-pink { @apply bg-pastel-pink/30 text-accent-pink; }
+  .badge-cyan { @apply bg-pastel-cyan/30 text-accent-cyan; }
+  .badge-orange { @apply bg-pastel-orange/30 text-accent-orange; }
+  .btn-primary {
+    @apply px-4 py-2 bg-gradient-blue text-white rounded-xl hover:opacity-90 transition-all text-sm font-medium shadow-sm;
+  }
+  .btn-secondary {
+    @apply px-4 py-2 bg-surface-card text-text-primary border border-surface-border rounded-xl hover:bg-surface-hover transition-all text-sm font-medium;
+  }
+  .btn-ghost {
+    @apply px-3 py-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded-xl transition-colors text-sm;
+  }
+  .stat-card {
+    @apply card p-5 flex flex-col gap-1;
+  }
+  .stat-value {
+    @apply text-2xl font-bold text-text-primary;
+  }
+  .stat-label {
+    @apply text-xs text-text-muted;
+  }
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-blue;
+  }
+}
+
+/* React Flow light theme styling */
+.react-flow__node {
+  font-family: inherit;
+}
+.react-flow__background {
+  background-color: #f8fafc !important;
+}
+.react-flow__minimap {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+}
+.react-flow__controls {
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+}
+.react-flow__controls-button {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  fill: #64748b !important;
+}
+.react-flow__controls-button:hover {
+  background-color: #f1f5f9 !important;
+  fill: #1e293b !important;
+}
