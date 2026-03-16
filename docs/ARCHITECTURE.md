@@ -3,44 +3,34 @@
 ## 整体架构
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                         claw-ops                            │
-│                                                            │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │                     React Router                       │  │
-│  │  /setup  /  /agents  /sessions  /channels  /cron      │  │
-│  │  /usage  /topology  /logs                              │  │
-│  └──────────────────────┬────────────────────────────────┘  │
-│                         │                                   │
-│  ┌──────────────────────▼────────────────────────────────┐  │
-│  │               Layout (共享 Shell)                       │  │
-│  │  ┌────────┐  ┌─────────────────────────────────────┐  │  │
-│  │  │ 侧边栏  │  │             内容区域                  │  │  │
-│  │  │ NavLink │  │  <Outlet key={refreshKey} />        │  │  │
-│  │  │ 8 items │  │                                     │  │  │
-│  │  └────────┘  └─────────────────────────────────────┘  │  │
-│  │  顶栏: 页面标题 | 连接状态 | 手动刷新                     │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                         │                                   │
-│  ┌──────────────────────▼────────────────────────────────┐  │
-│  │                    数据层                                │  │
-│  │  ┌──────────┐  ┌───────────┐  ┌──────────────────┐   │  │
-│  │  │ mock.ts  │  │ api.ts    │  │ config.ts        │   │  │
-│  │  │ (Mock)   │──│ (DataAPI) │──│ (配置/localStorage)│   │  │
-│  │  └──────────┘  └─────┬─────┘  └──────────────────┘   │  │
-│  │                      │                                 │  │
-│  │           ┌──────────▼──────────┐                      │  │
-│  │           │  gateway-client.ts  │                      │  │
-│  │           │  WebSocket JSON-RPC │                      │  │
-│  │           │  OpenClaw 协议        │                      │  │
-│  │           └──────────┬──────────┘                      │  │
-│  └──────────────────────┼────────────────────────────────┘  │
-└─────────────────────────┼───────────────────────────────────┘
-                          │ ws://
-                ┌─────────▼──────────┐
-                │  OpenClaw Gateway  │
-                │  :18789            │
-                └────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                           claw-ops                            │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │                    React Router / Layout                │  │
+│  │  /  /agents  /sessions  /channels  /cron  /usage       │  │
+│  │  /orchestration  /logs  /setup                         │  │
+│  └─────────────────────────┬───────────────────────────────┘  │
+│                            │ getAPI()                         │
+│  ┌─────────────────────────▼───────────────────────────────┐  │
+│  │                      DataAPI 层                          │  │
+│  │  sessions / logs / approvals / chat.send / patch / ... │  │
+│  ├─────────────────┬───────────────────────────────────────┤  │
+│  │   mockAPI       │   GatewayAPI                          │  │
+│  │   mock-workspace│   gateway-client.request()/on()      │  │
+│  └─────────────────┴──────────────────┬───────────────────┘  │
+│                                        │                     │
+│  ┌─────────────────────────────────────▼──────────────────┐  │
+│  │          Orchestration Runtime Semantic Layer          │  │
+│  │  task-tracker → flow-tracer → health-analyzer         │  │
+│  │  orchestration-runtime 负责装配、事件刷新和干预动作     │  │
+│  └─────────────────────────────────────┬──────────────────┘  │
+└────────────────────────────────────────┼─────────────────────┘
+                                         │ ws://
+                               ┌─────────▼──────────┐
+                               │  OpenClaw Gateway  │
+                               │  :18789            │
+                               └────────────────────┘
 ```
 
 ## 目录结构
@@ -55,16 +45,24 @@ claw-ops/
 │   └── cleanroom-spec/          # 历史规格文档
 ├── src/
 │   ├── types/
-│   │   └── openclaw.ts          # OpenClaw 协议类型定义 (686 行)
+│   │   └── openclaw.ts          # OpenClaw 协议类型定义
 │   ├── data/
-│   │   └── mock.ts              # Mock 数据层 (318 行)
+│   │   ├── mock.ts              # Mock 基础数据
+│   │   └── mock-workspace.ts    # 持久化 mock 工作区 / 可写运行态
 │   ├── lib/
-│   │   ├── api.ts               # 统一 DataAPI 接口 (280 行)
-│   │   ├── config.ts            # 运行配置 (109 行)
-│   │   ├── gateway-client.ts    # WebSocket JSON-RPC 客户端 (343 行)
+│   │   ├── api.ts               # 统一 DataAPI 接口
+│   │   ├── config.ts            # 运行配置
+│   │   ├── gateway-client.ts    # WebSocket JSON-RPC 客户端
+│   │   ├── orchestration-runtime.ts # 编排运行时装配 / 干预动作
+│   │   ├── task-tracker.ts      # 任务推断
+│   │   ├── flow-tracer.ts       # 路径高亮
+│   │   ├── health-analyzer.ts   # 健康分析
 │   │   └── export.ts            # CSV 导出工具
 │   ├── components/
-│   │   └── Layout.tsx           # 共享布局（侧边栏 + 顶栏 + Outlet）
+│   │   ├── Layout.tsx           # 共享布局（侧边栏 + 顶栏 + Outlet）
+│   │   ├── ActiveTasksPanel.tsx # 任务卡片与内联控制
+│   │   ├── OrchestratorHealthStrip.tsx # 编排健康条
+│   │   └── TaskStepTimeline.tsx # 任务步骤时间线
 │   ├── pages/
 │   │   ├── Dashboard.tsx        # 总览
 │   │   ├── Agents.tsx           # 智能体管理
@@ -106,21 +104,21 @@ claw-ops/
 ### Mock 模式（standalone / demo）
 
 ```
-Page Component → useEffect → getAPI() → mockAPI → src/data/mock.ts → 返回 Mock 数据
+Page Component → loadOrchestrationRuntime() → mockAPI → mock-workspace.ts → 返回可写运行态
 ```
 
-`mockAPI` 返回静态 Mock 数据的 Promise，页面组件通过 `useEffect` + `useState` 异步加载，具备 loading 和 error 处理。
+`mockAPI` 不再只是静态种子，而是通过 `mock-workspace.ts` 维护可写运行态：任务、审批、日志、session patch / reset、chat.send 都会写回 localStorage，保证控制面体验闭环。
 
 ### 实时模式（realtime）
 
 ```
-Page Component → useEffect → getAPI() → GatewayAPI → GatewayClient.request(method, params)
-                                                          │
-                                                          ▼ WebSocket JSON-RPC
-                                                     OpenClaw Gateway
+Page Component → loadOrchestrationRuntime() → DataAPI → GatewayAPI → GatewayClient.request(method, params)
+                                                                  │
+                                                                  ▼ WebSocket JSON-RPC
+                                                             OpenClaw Gateway
 ```
 
-`GatewayAPI` 通过 `GatewayClient` 发送 JSON-RPC 请求。客户端在首次 `getAPI()` 调用时单例创建并缓存。
+`GatewayAPI` 通过 `GatewayClient` 发送 JSON-RPC 请求。编排控制面额外依赖 `GatewayClient.on()` 监听 `agent` / `chat` / `exec.approval.*` / `session.update` / `agent.status` 等事件，以便在前端重算任务和路径状态。
 
 ### WebSocket 连接流程
 
@@ -205,13 +203,14 @@ type GatewayScope = 'operator.read' | 'operator.write' | 'operator.admin'
 | 路径 | 组件 | Layout | 说明 |
 |------|------|--------|------|
 | `/setup` | Setup | ❌ | 独立配置向导（4 步） |
-| `/` | Dashboard | ✅ | 总览（KPI + 趋势 + 智能体状态） |
+| `/` | Dashboard | ✅ | 总览（KPI + 编排健康 + 任务控制） |
 | `/agents` | Agents | ✅ | 智能体管理（创建/删除） |
 | `/sessions` | Sessions | ✅ | 会话管理（筛选/详情/重置/删除） |
 | `/channels` | Channels | ✅ | 渠道状态（连接/账户） |
 | `/cron` | CronJobs | ✅ | 定时任务（CRUD + 运行日志） |
 | `/usage` | Usage | ✅ | 用量分析（多维聚合 + 图表） |
-| `/topology` | Topology | ✅ | 拓扑视图（渠道↔智能体 DAG） |
+| `/orchestration` | Orchestration | ✅ | 编排控制面（任务 / 路径 / 审批 / 干预） |
+| `/topology` | Topology | ✅ | 兼容旧入口，重定向到 `/orchestration` |
 | `/logs` | Logs | ✅ | 日志查看（筛选 + 自动滚动） |
 | `*` | — | — | 重定向到 `/` |
 

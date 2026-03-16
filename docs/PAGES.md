@@ -4,29 +4,38 @@
 
 | 序号 | 页面 | 路径 | 核心功能 | 数据来源 (JSON-RPC) |
 |------|------|------|----------|---------------------|
-| 1 | 总览 | `/` | KPI + 趋势图 + 最近会话 + 智能体状态 | `agents.list` `sessions.list` `sessions.usage` `channels.status` |
+| 1 | 总览 | `/` | KPI + 编排健康条 + 任务控制面 + 趋势图 + 最近会话 | `agents.list` `sessions.list` `sessions.usage` `channels.status` `logs.tail` `exec.approvals.get` |
 | 2 | 智能体 | `/agents` | 智能体卡片 + 创建/删除 | `agents.list` `agents.create` `agents.delete` |
 | 3 | 会话 | `/sessions` | 会话表格 + 筛选 + 详情 + 操作 | `sessions.list` `sessions.reset` `sessions.delete` |
 | 4 | 渠道 | `/channels` | 渠道连接状态 + 账户详情 | `channels.status` |
 | 5 | 定时任务 | `/cron` | Cron CRUD + 运行日志 + 手动触发 | `cron.list` `cron.add` `cron.update` `cron.remove` `cron.run` `cron.runs` |
 | 6 | 用量分析 | `/usage` | Token/费用趋势 + 多维聚合 | `sessions.usage` |
-| 7 | 拓扑 | `/topology` | 渠道↔智能体 DAG 图 | `agents.list` `channels.status` |
-| 8 | 日志 | `/logs` | 实时日志 + 筛选 + 导出 | `logs.tail` |
-| 9 | 配置 | `/setup` | 4 步配置向导 | `health`（连接测试） |
+| 7 | 编排控制面 | `/orchestration` | 任务追踪 + 路径高亮 + 审批门禁 + 干预动作 + 通道拓扑 + 组织架构 | `sessions.list` `sessions.patch` `sessions.reset` `sessions.usage` `channels.status` `logs.tail` `exec.approvals.get` `exec.approval.resolve` `chat.send` |
+| 8 | 拓扑 | `/topology` | 兼容旧入口，重定向到编排控制面 | — |
+| 9 | 日志 | `/logs` | 实时日志 + 筛选 + 导出 | `logs.tail` |
+| 10 | 配置 | `/setup` | 4 步配置向导 | `health`（连接测试） |
 
 ---
 
 ## 1. 总览 (Dashboard)
 
-**路径**：`/`  |  **文件**：`src/pages/Dashboard.tsx`  |  **数据**：`getAgents()` `getSessions()` `getSessionsUsage()` `getChannelsStatus()`
+**路径**：`/`  |  **文件**：`src/pages/Dashboard.tsx`  |  **数据**：`loadOrchestrationRuntime()`（内部使用 `getAgents()` `getSessions()` `getSessionsUsage()` `getChannelsStatus()` `getLogs()` `getExecApprovals()`）
 
 ### 功能模块
 
 #### KPI 指标卡（4 项）
-- 智能体总数
-- 活跃会话数
+- 活跃任务数
+- 待审批数
 - 已连接渠道数
 - 总费用（$）
+
+#### 编排健康条
+- 显示编排健康分、层级覆盖、吞吐、瓶颈和成本建议
+- 直接链接到 `/orchestration`
+
+#### 运行态任务列表
+- 展示任务状态、当前负责角色、审批积压、token 消耗和步骤时间线
+- 支持内联动作：暂停/恢复、催办、重置、审批通过/驳回
 
 #### 14 天用量趋势图
 - 面积图：Token 消耗 + 费用趋势
@@ -209,11 +218,43 @@
 
 ---
 
-## 7. 拓扑视图 (Topology)
+## 7. 编排控制面 (Orchestration)
+
+**路径**：`/orchestration`  |  **文件**：`src/pages/Orchestration.tsx`  |  **数据**：`loadOrchestrationRuntime()` + `importExperiencePreset()`
+
+### 功能模块
+
+#### 顶部控制面摘要
+- 当前模板 / 当前运行团队 / 任务统计
+- 与总览共用的编排健康条
+
+#### 任务控制侧栏
+- 活跃任务卡片列表
+- 任务步骤时间线
+- 快速干预：暂停、恢复、催办、重置、审批通过/驳回、重派
+
+#### 三种可视化视图
+- **执行图谱**：高亮当前任务路径、门禁和交付归并
+- **入口拓扑**：查看渠道如何进入组织网络
+- **组织架构**：查看层级覆盖与角色负载
+
+#### 模板导入与预览
+- 团队模板浏览器
+- 预览态与当前运行团队解耦：可边运行边查看其他模板
+
+#### 事件驱动刷新
+- 订阅 `agent` / `chat` / `exec.approval.*` / `session.update` / `agent.status`
+- 在 Gateway 模式下自动更新任务与画布
+
+---
+
+## 8. 拓扑视图 (Topology)
 
 **路径**：`/topology`  |  **文件**：`src/pages/Topology.tsx`  |  **数据**：`getAgents()` `getChannelsStatus()`
 
 ### 功能模块
+
+- 旧入口兼容，现已重定向到 `/orchestration`
 
 #### 交互式 DAG 拓扑图
 - **左侧**：渠道节点（来自 `channels.status`）

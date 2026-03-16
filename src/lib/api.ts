@@ -19,6 +19,8 @@ import type {
   CronRemoveParams,
   CronRunParams,
   CronRunsParams,
+  ChatSendParams,
+  ChatMessage,
   LogEntry,
   LogsTailParams,
   LogsTailResult,
@@ -66,6 +68,9 @@ export interface DataAPI {
   resetSession(key: string): Promise<void>
   deleteSession(key: string): Promise<void>
   getSessionsUsage(params?: SessionsUsageParams): Promise<SessionsUsageResult>
+
+  // Chat
+  sendChatMessage(params: ChatSendParams): Promise<ChatMessage[]>
 
   // Channels
   getChannelsStatus(): Promise<ChannelsStatusResult>
@@ -184,6 +189,10 @@ class GatewayAPI implements DataAPI {
 
   async getSessionsUsage(params?: SessionsUsageParams) {
     return this.client.request<SessionsUsageResult>(GATEWAY_METHODS.SESSIONS_USAGE, params)
+  }
+
+  async sendChatMessage(params: ChatSendParams) {
+    return this.client.request<ChatMessage[]>(GATEWAY_METHODS.CHAT_SEND, params)
   }
 
   async getChannelsStatus() {
@@ -351,6 +360,7 @@ const mockAPI: DataAPI = {
   async resetSession(key) { mockWorkspace.resetMockSession(key) },
   async deleteSession(key) { mockWorkspace.deleteMockSession(key) },
   async getSessionsUsage() { return mockWorkspace.getMockUsage() },
+  async sendChatMessage(params) { return mockWorkspace.sendMockChatMessage(params) },
   async getChannelsStatus() { return mockWorkspace.getMockChannelsStatus() },
   async getCronJobs() { return mockWorkspace.getMockCronJobs() },
   async addCronJob() { return { id: 'new-cron' } },
@@ -364,7 +374,7 @@ const mockAPI: DataAPI = {
   async getNodes() { return mockWorkspace.getMockNodes() },
   async getConfig() { return mockWorkspace.getMockConfig() },
   async getExecApprovals() { return mockWorkspace.getMockExecApprovals() },
-  async resolveExecApproval() {},
+  async resolveExecApproval(requestId, decision) { mockWorkspace.resolveMockExecApproval(requestId, decision) },
 }
 
 // ==========================================

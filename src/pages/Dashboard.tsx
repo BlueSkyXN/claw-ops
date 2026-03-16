@@ -1,16 +1,13 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
 import { useNavigate } from 'react-router-dom'
-import { getAPI } from '../lib/api'
-import type { AgentSummary, GatewaySessionRow, SessionsUsageResult, ChannelsStatusResult } from '../types/openclaw'
-import type { MockExperienceSummary } from '../data/mock-workspace'
-import { importExperiencePreset } from '../lib/orchestration'
-import QuickStartBanner from '../components/QuickStartBanner'
+import type { ActiveTaskPanelAction } from '../components/ActiveTasksPanel'
+import ActiveTasksPanel from '../components/ActiveTasksPanel'
 import OrchestratorHealthStrip from '../components/OrchestratorHealthStrip'
-
-// ==========================================
-// Tooltip
-// ==========================================
+import QuickStartBanner from '../components/QuickStartBanner'
+import { importExperiencePreset } from '../lib/orchestration'
+import { loadOrchestrationRuntime, performTaskIntervention, subscribeToOrchestrationEvents } from '../lib/orchestration-runtime'
+import type { TrackedTask } from '../lib/task-tracker'
 
 const ChartTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; name: string; color: string }>; label?: string }) => {
   if (!active || !payload) return null
@@ -25,10 +22,6 @@ const ChartTooltip = ({ active, payload, label }: { active?: boolean; payload?: 
     </div>
   )
 }
-
-// ==========================================
-// Helpers
-// ==========================================
 
 function formatCost(cost: number): string {
   if (cost < 0.01) return `$${cost.toFixed(4)}`
@@ -60,68 +53,46 @@ const CHANNEL_ICONS: Record<string, string> = {
 
 function channelIcon(ch: string): string {
   const key = ch.toLowerCase()
-  for (const [k, v] of Object.entries(CHANNEL_ICONS)) {
-    if (key.includes(k)) return v
+  for (const [iconKey, icon] of Object.entries(CHANNEL_ICONS)) {
+    if (key.includes(iconKey)) return icon
   }
   return '📡'
 }
-
-// ==========================================
-// Loading skeleton
-// ==========================================
 
 function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`animate-pulse bg-surface-hover rounded ${className}`} />
 }
 
-function isExperienceSummary(value: unknown): value is MockExperienceSummary {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as Record<string, unknown>
-  return typeof candidate.templateId === 'string' && typeof candidate.name === 'string' && typeof candidate.layerCounts === 'object'
-}
-
-// ==========================================
-// Dashboard
-// ==========================================
-
 export default function Dashboard() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
-  const [agents, setAgents] = useState<AgentSummary[]>([])
-  const [sessions, setSessions] = useState<GatewaySessionRow[]>([])
-  const [usage, setUsage] = useState<SessionsUsageResult | null>(null)
-  const [channels, setChannels] = useState<ChannelsStatusResult | null>(null)
-  const [experience, setExperience] = useState<MockExperienceSummary | null>(null)
+  const [runtime, setRuntime] = useState<Awaited<ReturnType<typeof loadOrchestrationRuntime>> | null>(null)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [actionBusyKey, setActionBusyKey] = useState<string | null>(null)
   const [importingPreset, setImportingPreset] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     setError(null)
     try {
-      const api = getAPI()
-      const [agentsRes, sessionsRes, usageRes, channelsRes, configRes] = await Promise.all([
-        api.getAgents(),
-        api.getSessions({ limit: 100, includeDerivedTitles: true, includeLastMessage: true }),
-        api.getSessionsUsage(),
-        api.getChannelsStatus(),
-        api.getConfig(),
-      ])
-      setAgents(agentsRes)
-      setSessions(sessionsRes.sessions)
-      setUsage(usageRes)
-      setChannels(channelsRes)
-      setExperience(isExperienceSummary(configRes.experience) ? configRes.experience : null)
+      const nextRuntime = await loadOrchestrationRuntime()
+      setRuntime(nextRuntime)
+      setSelectedTaskId((current) => nextRuntime.tasks.some((task) => task.id === current) ? current : nextRuntime.tasks[0]?.id ?? null)
     } catch (err) {
       setError(err instanceof Error ? err.message : '数据加载失败')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
     void loadData()
   }, [loadData])
+
+  useEffect(() => subscribeToOrchestrationEvents(() => {
+    void loadData(true)
+  }), [loadData])
 
   const handleQuickImport = useCallback(async () => {
     let shouldReset = true
@@ -141,72 +112,97 @@ export default function Dashboard() {
     }
   }, [loadData, navigate])
 
-  // Derived data
+  const handleTaskAction = useCallback(async (action: ActiveTaskPanelAction, task: TrackedTask, approvalId?: string) => {
+    const busyKey = `${task.id}:${action}`
+    setActionBusyKey(busyKey)
+    setError(null)
+    try {
+      switch (action) {
+        case 'pause':
+          await performTaskIntervention({ kind: 'pause', task })
+          break
+        case 'resume':
+          await performTaskIntervention({ kind: 'resume', task })
+          break
+        case 'reset':
+          await performTaskIntervention({ kind: 'reset', task })
+          break
+        case 'nudge':
+          await performTaskIntervention({ kind: 'nudge', task })
+          break
+        case 'approve':
+          await performTaskIntervention({ kind: 'approve', task, approvalId })
+          break
+        case 'deny':
+          await performTaskIntervention({ kind: 'deny', task, approvalId })
+          break
+      }
+      await loadData(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '任务操作失败')
+    } finally {
+      setActionBusyKey(null)
+    }
+  }, [loadData])
+
   const connectedAccounts = useMemo(() => {
-    if (!channels) return 0
+    if (!runtime?.channels) return 0
     let count = 0
-    for (const accounts of Object.values(channels.channelAccounts)) {
-      for (const acc of accounts as Array<{ connected?: boolean }>) {
-        if (acc.connected) count++
+    for (const accounts of Object.values(runtime.channels.channelAccounts)) {
+      for (const acc of accounts) {
+        if (acc.connected) count += 1
       }
     }
     return count
-  }, [channels])
+  }, [runtime?.channels])
 
-  const totalChannels = useMemo(() => {
-    return channels?.channelOrder.length ?? 0
-  }, [channels])
-
-  const activeSessions = useMemo(() => {
-    const now = Date.now()
-    const threshold = 30 * 60 * 1000 // 30 minutes
-    return sessions.filter(s => s.updatedAt && (now - s.updatedAt) < threshold).length
-  }, [sessions])
+  const totalChannels = useMemo(() => runtime?.channels.channelOrder.length ?? 0, [runtime?.channels])
 
   const dailyData = useMemo(() => {
-    if (!usage?.aggregates?.daily) return []
-    return usage.aggregates.daily.map(d => ({
-      date: d.date.slice(5), // MM-DD
-      tokens: d.tokens,
-      cost: d.cost,
-      messages: d.messages,
+    if (!runtime?.usage.aggregates?.daily) return []
+    return runtime.usage.aggregates.daily.map((entry) => ({
+      date: entry.date.slice(5),
+      tokens: entry.tokens,
+      cost: entry.cost,
+      messages: entry.messages,
     }))
-  }, [usage])
+  }, [runtime?.usage])
 
   const modelData = useMemo(() => {
-    if (!usage?.aggregates?.byModel) return []
-    return usage.aggregates.byModel
+    if (!runtime?.usage.aggregates?.byModel) return []
+    return [...runtime.usage.aggregates.byModel]
       .sort((a, b) => b.totals.totalTokens - a.totals.totalTokens)
       .slice(0, 8)
-      .map(m => ({
-        model: m.model.length > 20 ? m.model.slice(0, 18) + '…' : m.model,
-        tokens: m.totals.totalTokens,
-        cost: m.totals.totalCost,
-        calls: m.count,
+      .map((entry) => ({
+        model: entry.model.length > 20 ? `${entry.model.slice(0, 18)}…` : entry.model,
+        tokens: entry.totals.totalTokens,
+        cost: entry.totals.totalCost,
+        calls: entry.count,
       }))
-  }, [usage])
+  }, [runtime?.usage])
 
   const recentSessions = useMemo(() => {
-    return [...sessions]
-      .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
-      .slice(0, 8)
-  }, [sessions])
+    return runtime?.sessions
+      ? [...runtime.sessions].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)).slice(0, 8)
+      : []
+  }, [runtime?.sessions])
 
   const statCards = [
     {
-      label: '智能体数量',
-      value: agents.length,
-      icon: '🤖',
+      label: '活跃任务',
+      value: runtime?.taskSummary.active ?? 0,
+      sub: runtime ? `等待 ${runtime.taskSummary.waiting} 个` : undefined,
+      icon: '🧠',
       color: 'text-accent-blue',
       bg: 'bg-pastel-blue/20',
     },
     {
-      label: '活跃会话',
-      value: activeSessions,
-      sub: `共 ${sessions.length} 个`,
-      icon: '💬',
-      color: 'text-accent-cyan',
-      bg: 'bg-pastel-cyan/20',
+      label: '待审批',
+      value: runtime?.taskSummary.pendingApprovals ?? 0,
+      sub: runtime ? `停滞 ${runtime.taskSummary.stalled} 个` : undefined,
+      icon: '🔒',
+      color: 'text-accent-yellow',
+      bg: 'bg-pastel-yellow/20',
     },
     {
       label: '已连接渠道',
@@ -218,22 +214,21 @@ export default function Dashboard() {
     },
     {
       label: '总费用',
-      value: usage ? formatCost(usage.totals.totalCost) : '-',
-      sub: usage ? `${usage.totals.totalTokens.toLocaleString()} tokens` : undefined,
+      value: runtime ? formatCost(runtime.usage.totals.totalCost) : '-',
+      sub: runtime ? `${runtime.usage.totals.totalTokens.toLocaleString()} tokens` : undefined,
       icon: '💰',
-      color: 'text-accent-yellow',
-      bg: 'bg-pastel-yellow/20',
+      color: 'text-accent-cyan',
+      bg: 'bg-pastel-cyan/20',
     },
   ]
 
-  // Error state
-  if (error && !loading) {
+  if (error && !loading && !runtime) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center space-y-3">
           <div className="text-4xl">⚠️</div>
           <p className="text-text-secondary">{error}</p>
-          <button onClick={() => window.location.reload()} className="btn-secondary text-sm">
+          <button onClick={() => void loadData()} className="btn-secondary text-sm">
             重新加载
           </button>
         </div>
@@ -243,39 +238,54 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {!loading && experience === null && (
+      {!loading && runtime?.experience === null && (
         <QuickStartBanner
           title="还没有激活团队编排？直接导入 OPC 超级助理"
-          description="一键拉起策略、产品、研发、内容、运维与复盘角色，并同步生成可体验的渠道、会话、日志和编排画布。"
+          description="一键拉起策略、产品、研发、内容、运维与复盘角色，并同步生成真实可观测的任务、审批与编排控制面。"
           busy={importingPreset}
           onPreview={() => navigate('/orchestration')}
           onImport={handleQuickImport}
         />
       )}
 
-      {/* Stat cards */}
       <div className="grid grid-cols-4 gap-4">
-        {statCards.map(s => (
-          <div key={s.label} className="stat-card">
+        {statCards.map((stat) => (
+          <div key={stat.label} className="stat-card">
             <div className="flex items-center justify-between">
-              <span className="stat-label">{s.label}</span>
-              <span className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center text-sm`}>
-                {s.icon}
+              <span className="stat-label">{stat.label}</span>
+              <span className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center text-sm`}>
+                {stat.icon}
               </span>
             </div>
             {loading ? (
               <Skeleton className="h-8 w-20 mt-1" />
             ) : (
-              <span className={`stat-value ${s.color}`}>{s.value}</span>
+              <span className={`stat-value ${stat.color}`}>{stat.value}</span>
             )}
-            {s.sub && <span className="text-[11px] text-text-secondary">{s.sub}</span>}
+            {stat.sub && <span className="text-[11px] text-text-secondary">{stat.sub}</span>}
           </div>
         ))}
       </div>
 
-      <OrchestratorHealthStrip experience={experience} />
+      <OrchestratorHealthStrip experience={runtime?.experience ?? null} health={runtime?.health ?? null} taskSummary={runtime?.taskSummary ?? null} />
 
-      {/* Daily usage trend */}
+      <ActiveTasksPanel
+        title="运行中任务"
+        subtitle={runtime?.activeExperiencePreset ? `当前控制面正在观测 ${runtime.activeExperiencePreset.summary.name}` : '当前尚未激活企业编排模板'}
+        tasks={runtime?.tasks ?? []}
+        selectedTaskId={selectedTaskId}
+        onSelectTask={(task) => setSelectedTaskId(task.id)}
+        onAction={handleTaskAction}
+        busyKey={actionBusyKey}
+        maxItems={4}
+      />
+
+      {error && (
+        <div className="rounded-2xl border border-accent-red/30 bg-pastel-red/20 px-4 py-3 text-sm text-accent-red">
+          {error}
+        </div>
+      )}
+
       <div className="card p-5">
         <h3 className="text-sm font-semibold text-text-primary mb-4">用量趋势 · 近 14 天</h3>
         {loading ? (
@@ -296,7 +306,7 @@ export default function Dashboard() {
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={{ stroke: '#e2e8f0' }} />
               <YAxis yAxisId="tokens" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={{ stroke: '#e2e8f0' }} />
-              <YAxis yAxisId="cost" orientation="right" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={{ stroke: '#e2e8f0' }} tickFormatter={(v: number) => `$${v}`} />
+              <YAxis yAxisId="cost" orientation="right" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={{ stroke: '#e2e8f0' }} tickFormatter={(value: number) => `$${value}`} />
               <Tooltip content={<ChartTooltip />} />
               <Area yAxisId="tokens" type="monotone" dataKey="tokens" name="Tokens" stroke="#3b82f6" fill="url(#gradTokens)" strokeWidth={2} />
               <Area yAxisId="cost" type="monotone" dataKey="cost" name="费用 ($)" stroke="#22c55e" fill="url(#gradCost)" strokeWidth={2} />
@@ -305,16 +315,15 @@ export default function Dashboard() {
         ) : (
           <div className="h-[240px] flex items-center justify-center text-text-muted text-sm">暂无用量数据</div>
         )}
-        {usage && !loading && (
+        {runtime && !loading && (
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-surface-border text-xs text-text-secondary">
-            <span>总消耗: {usage.totals.totalTokens.toLocaleString()} tokens</span>
-            <span>总费用: {formatCost(usage.totals.totalCost)}</span>
-            <span>API 调用: {usage.totals.calls.toLocaleString()} 次</span>
+            <span>总消耗: {runtime.usage.totals.totalTokens.toLocaleString()} tokens</span>
+            <span>总费用: {formatCost(runtime.usage.totals.totalCost)}</span>
+            <span>API 调用: {runtime.usage.totals.calls.toLocaleString()} 次</span>
           </div>
         )}
       </div>
 
-      {/* Model usage distribution */}
       <div className="card p-5">
         <h3 className="text-sm font-semibold text-text-primary mb-4">模型用量分布</h3>
         {loading ? (
@@ -323,7 +332,7 @@ export default function Dashboard() {
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={modelData} layout="vertical" margin={{ left: 10, right: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={{ stroke: '#e2e8f0' }} tickFormatter={(v: number) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v)} />
+              <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={{ stroke: '#e2e8f0' }} tickFormatter={(value: number) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}M` : value >= 1000 ? `${(value / 1000).toFixed(0)}K` : String(value)} />
               <YAxis type="category" dataKey="model" tick={{ fontSize: 11, fill: '#94a3b8' }} width={120} axisLine={{ stroke: '#e2e8f0' }} />
               <Tooltip content={<ChartTooltip />} />
               <Bar dataKey="tokens" name="Tokens" fill="#818cf8" radius={[0, 4, 4, 0]} barSize={18} />
@@ -334,44 +343,42 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Bottom split: Recent sessions + Agents */}
       <div className="grid grid-cols-2 gap-6">
-        {/* Recent sessions */}
         <div className="card p-5">
           <h3 className="text-sm font-semibold text-text-primary mb-3">最近会话</h3>
           {loading ? (
             <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Skeleton key={index} className="h-12 w-full" />
               ))}
             </div>
           ) : recentSessions.length > 0 ? (
             <div className="space-y-1">
-              {recentSessions.map(s => (
-                <div key={s.key} className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-surface-hover transition-colors">
-                  <span className="text-base flex-shrink-0">{channelIcon(s.channel ?? s.lastChannel ?? '')}</span>
+              {recentSessions.map((session) => (
+                <div key={session.key} className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-surface-hover transition-colors">
+                  <span className="text-base flex-shrink-0">{channelIcon(session.channel ?? session.lastChannel ?? '')}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm text-text-primary truncate font-medium">
-                        {s.derivedTitle || s.label || s.displayName || s.key}
+                        {session.derivedTitle || session.label || session.displayName || session.key}
                       </p>
-                      {s.kind && s.kind !== 'unknown' && (
+                      {session.kind && session.kind !== 'unknown' && (
                         <span className={`badge text-[10px] ${
-                          s.kind === 'direct' ? 'badge-blue' : s.kind === 'group' ? 'badge-purple' : 'badge-cyan'
+                          session.kind === 'direct' ? 'badge-blue' : session.kind === 'group' ? 'badge-purple' : 'badge-cyan'
                         }`}>
-                          {s.kind}
+                          {session.kind}
                         </span>
                       )}
                     </div>
                     <p className="text-[11px] text-text-muted truncate">
-                      {s.lastMessagePreview || '暂无消息'}
+                      {session.lastMessagePreview || '暂无消息'}
                     </p>
                   </div>
                   <div className="flex flex-col items-end flex-shrink-0 gap-1">
-                    <span className="text-[10px] text-text-muted">{relativeTime(s.updatedAt)}</span>
-                    {(s.totalTokens != null && s.totalTokens > 0) && (
+                    <span className="text-[10px] text-text-muted">{relativeTime(session.updatedAt)}</span>
+                    {(session.totalTokens != null && session.totalTokens > 0) && (
                       <span className="text-[10px] text-text-secondary">
-                        {s.totalTokens.toLocaleString()} tk
+                        {session.totalTokens.toLocaleString()} tk
                       </span>
                     )}
                   </div>
@@ -383,23 +390,22 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Agent list */}
         <div className="card p-5">
           <h3 className="text-sm font-semibold text-text-primary mb-3">智能体列表</h3>
           {loading ? (
             <div className="grid grid-cols-2 gap-2">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Skeleton key={index} className="h-16 w-full" />
               ))}
             </div>
-          ) : agents.length > 0 ? (
+          ) : runtime?.agents.length ? (
             <div className="grid grid-cols-2 gap-2">
-              {agents.map(a => (
-                <div key={a.id} className="flex items-center gap-3 p-3 rounded-xl border border-surface-border hover:bg-surface-hover transition-colors">
-                  <span className="text-xl flex-shrink-0">{a.identity?.emoji || '🤖'}</span>
+              {runtime.agents.map((agent) => (
+                <div key={agent.id} className="flex items-center gap-3 p-3 rounded-xl border border-surface-border hover:bg-surface-hover transition-colors">
+                  <span className="text-xl flex-shrink-0">{agent.identity?.emoji || '🤖'}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-text-primary font-medium truncate">{a.name || a.id}</p>
-                    <p className="text-[11px] text-text-muted truncate">{a.id}</p>
+                    <p className="text-sm text-text-primary font-medium truncate">{agent.name || agent.id}</p>
+                    <p className="text-[11px] text-text-muted truncate">{agent.id}</p>
                   </div>
                 </div>
               ))}

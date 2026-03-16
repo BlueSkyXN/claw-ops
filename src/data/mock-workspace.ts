@@ -4,6 +4,8 @@ import type {
   AgentsDeleteParams,
   AgentsFileEntry,
   AgentsUpdateParams,
+  ChatMessage,
+  ChatSendParams,
   ChannelAccountSnapshot,
   ChannelsStatusResult,
   CronJob,
@@ -37,7 +39,7 @@ import {
   mockUsage,
 } from './mock'
 
-const STORAGE_KEY = 'claw-ops-mock-workspace-v2'
+const STORAGE_KEY = 'claw-ops-mock-workspace-v3'
 
 type LayerId = 'L0' | 'L1' | 'L2' | 'L3'
 
@@ -137,7 +139,16 @@ function uniqueAgentId(candidate: string, agents: AgentSummary[]): string {
   return `${normalized}-${seq}`
 }
 
+function findTrailingAgentId(sessionKey: string, agents: AgentSummary[]): string | null {
+  const sortedIds = [...agents.map((agent) => agent.id)].sort((left, right) => right.length - left.length)
+  return sortedIds.find((agentId) => sessionKey.endsWith(`-${agentId}`)) ?? null
+}
+
 function detectSessionAgent(session: GatewaySessionRow, agents: AgentSummary[]): AgentSummary | undefined {
+  const trailingAgentId = findTrailingAgentId(session.key, agents)
+  if (trailingAgentId) {
+    return agents.find((agent) => agent.id === trailingAgentId)
+  }
   return agents.find((agent) => session.key.includes(agent.id))
 }
 
@@ -545,6 +556,115 @@ export function getMockExecApprovals(): ExecApprovalRequest[] {
   return clone(ensureWorkspace().execApprovals)
 }
 
+export function resolveMockExecApproval(requestId: string, decision: 'approved' | 'denied'): void {
+  commitWorkspace((workspace) => {
+    const approval = workspace.execApprovals.find((entry) => entry.id === requestId)
+    if (!approval) return
+
+    workspace.execApprovals = workspace.execApprovals.filter((entry) => entry.id !== requestId)
+    workspace.sessionsList.sessions = workspace.sessionsList.sessions.map((session) => {
+      if (session.key !== approval.sessionKey) return session
+      return {
+        ...session,
+        updatedAt: Date.now(),
+        sendPolicy: decision === 'approved' ? 'allow' : 'deny',
+        lastMessagePreview: decision === 'approved'
+          ? `审批已通过：${approval.description ?? approval.tool ?? '控制面放行'}`
+          : `审批已驳回：${approval.description ?? approval.tool ?? '控制面阻断'}`,
+        abortedLastRun: decision === 'denied' ? true : session.abortedLastRun,
+      }
+    })
+
+    workspace.logs = [
+      {
+        ts: Date.now(),
+        level: decision === 'approved' ? 'info' : 'warn',
+        source: 'orchestration-control',
+        message: decision === 'approved'
+          ? `审批已通过：${approval.description ?? approval.id}`
+          : `审批已驳回：${approval.description ?? approval.id}`,
+        raw: `[${new Date().toISOString()}] ${decision === 'approved' ? 'INFO' : 'WARN'} orchestration-control: ${decision === 'approved' ? '审批已通过' : '审批已驳回'}：${approval.description ?? approval.id}`,
+      },
+      ...workspace.logs,
+    ].slice(0, 200)
+  })
+}
+
+export function sendMockChatMessage(params: ChatSendParams): ChatMessage[] {
+  const now = Date.now()
+  const tokenDelta = Math.max(900, Math.round(params.text.length * 42))
+  let messages: ChatMessage[] = []
+
+  commitWorkspace((workspace) => {
+    const targetAgentId = params.agentId
+      ?? findTrailingAgentId(params.sessionKey, workspace.agents)
+      ?? workspace.agents[0]?.id
+      ?? 'default'
+    const existingIndex = workspace.sessionsList.sessions.findIndex((session) => session.key === params.sessionKey)
+    const existingSession = existingIndex >= 0 ? workspace.sessionsList.sessions[existingIndex] : null
+    const nextSession: GatewaySessionRow = existingSession
+      ? {
+          ...existingSession,
+          updatedAt: now,
+          sendPolicy: 'allow',
+          channel: params.channel ?? existingSession.channel ?? 'api',
+          model: params.model ?? existingSession.model,
+          lastMessagePreview: params.text,
+          totalTokens: (existingSession.totalTokens ?? 0) + tokenDelta,
+          inputTokens: (existingSession.inputTokens ?? 0) + Math.round(tokenDelta * 0.45),
+          outputTokens: (existingSession.outputTokens ?? 0) + Math.round(tokenDelta * 0.55),
+        }
+      : {
+          key: params.sessionKey,
+          kind: 'direct',
+          label: typeof params.metadata?.taskTitle === 'string'
+            ? params.metadata.taskTitle
+            : `控制操作 · ${targetAgentId}`,
+          displayName: typeof params.to === 'string' ? params.to : targetAgentId,
+          channel: params.channel ?? (params.sessionKey.startsWith('sess-api-') ? 'api' : 'web'),
+          updatedAt: now,
+          totalTokens: tokenDelta,
+          inputTokens: Math.round(tokenDelta * 0.45),
+          outputTokens: Math.round(tokenDelta * 0.55),
+          model: params.model,
+          modelProvider: 'anthropic',
+          lastMessagePreview: params.text,
+          sendPolicy: 'allow',
+          responseUsage: 'tokens',
+          contextTokens: 200000,
+        }
+
+    if (existingIndex >= 0) {
+      workspace.sessionsList.sessions[existingIndex] = nextSession
+    } else {
+      workspace.sessionsList.sessions.unshift(nextSession)
+    }
+
+    if (nextSession.channel) {
+      upsertAccountActivity(workspace.channelsStatus.channelAccounts, nextSession.channel)
+    }
+
+    const controlAction = typeof params.metadata?.controlAction === 'string' ? params.metadata.controlAction : 'message'
+    workspace.logs = [
+      {
+        ts: now,
+        level: 'info',
+        source: 'orchestration-control',
+        message: `已发送控制消息（${controlAction}）到 ${targetAgentId}`,
+        raw: `[${new Date(now).toISOString()}] INFO orchestration-control: 已发送控制消息（${controlAction}）到 ${targetAgentId}`,
+      },
+      ...workspace.logs,
+    ].slice(0, 200)
+
+    messages = [
+      { id: `msg-${now}`, role: 'user', text: params.text, timestamp: now },
+      { id: `msg-${now + 1}`, role: 'assistant', text: `控制消息已投递给 ${targetAgentId}`, timestamp: now + 800 },
+    ]
+  })
+
+  return messages
+}
+
 export function createMockAgent(params: AgentsCreateParams): { agentId: string } {
   let agentId = ''
 
@@ -645,6 +765,17 @@ export function patchMockSession(params: SessionsPatchParams): void {
         updatedAt: Date.now(),
       }
     })
+
+    workspace.logs = [
+      {
+        ts: Date.now(),
+        level: 'info',
+        source: 'orchestration-control',
+        message: `已更新会话策略：${params.key}`,
+        raw: `[${new Date().toISOString()}] INFO orchestration-control: 已更新会话策略：${params.key}`,
+      },
+      ...workspace.logs,
+    ].slice(0, 200)
   })
 }
 
@@ -661,6 +792,17 @@ export function resetMockSession(key: string): void {
         lastMessagePreview: '会话已重置，等待新的编排任务',
       }
     })
+
+    workspace.logs = [
+      {
+        ts: Date.now(),
+        level: 'warn',
+        source: 'orchestration-control',
+        message: `会话已被控制面重置：${key}`,
+        raw: `[${new Date().toISOString()}] WARN orchestration-control: 会话已被控制面重置：${key}`,
+      },
+      ...workspace.logs,
+    ].slice(0, 200)
   })
 }
 

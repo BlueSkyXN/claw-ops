@@ -429,6 +429,104 @@ function findRole(roleId: string, roles: PresetRoleDetail[]): PresetRoleDetail {
   return role
 }
 
+type WorkflowStep = PresetTeamTemplate['workflow'][number]
+
+type GeneratedTaskScenarioStep = WorkflowStep & {
+  sessionKey: string
+  updatedAt: number
+  totalTokens: number
+  state: 'running' | 'waiting' | 'completed'
+}
+
+interface GeneratedTaskScenario {
+  id: string
+  quickStart: ExperienceQuickStart
+  owner: PresetRoleDetail
+  rootSessionKey: string
+  rootUpdatedAt: number
+  rootTotalTokens: number
+  status: 'active' | 'waiting' | 'completed'
+  steps: GeneratedTaskScenarioStep[]
+}
+
+function collectWorkflowSteps(workflow: PresetTeamTemplate['workflow'], ownerRoleId: string): PresetTeamTemplate['workflow'] {
+  const reachable = new Set<string>([ownerRoleId])
+  const selected: PresetTeamTemplate['workflow'] = []
+
+  let changed = true
+  while (changed) {
+    changed = false
+    workflow.forEach((step) => {
+      const stepKey = `${step.from}->${step.to}`
+      if (!reachable.has(step.from) || selected.some((entry) => `${entry.from}->${entry.to}` === stepKey)) {
+        return
+      }
+      selected.push(step)
+      if (!reachable.has(step.to)) {
+        reachable.add(step.to)
+        changed = true
+      }
+    })
+  }
+
+  return selected
+}
+
+function buildTaskScenarios(
+  summary: ExperiencePresetSummary,
+  template: PresetTeamTemplate,
+  roles: PresetRoleDetail[],
+): GeneratedTaskScenario[] {
+  const now = Date.now()
+  const profiles: Array<'active' | 'waiting' | 'completed'> = ['active', 'waiting', 'completed']
+
+  return summary.quickStarts.map((quickStart, index) => {
+    const owner = findRole(quickStart.ownerRoleId, roles)
+    const taskSlug = slug(quickStart.id)
+    const workflowSteps = collectWorkflowSteps(template.workflow, owner.manifest.id)
+    const profile = profiles[index % profiles.length]
+    const startedAt = now - (index * 36 + 28) * 60_000
+    const progressIndex = workflowSteps.length === 0
+      ? 0
+      : profile === 'completed'
+        ? workflowSteps.length - 1
+        : profile === 'waiting'
+          ? Math.max(0, workflowSteps.findIndex((step) => step.mandatory))
+          : Math.min(1, workflowSteps.length - 1)
+    const rootSessionKey = `sess-${quickStart.channel}-${slug(quickStart.user)}-${taskSlug}-${owner.manifest.id}`
+
+    const steps = workflowSteps
+      .filter((_, stepIndex) => stepIndex <= progressIndex)
+      .map((step, stepIndex) => {
+        const isCurrent = stepIndex === progressIndex
+        return {
+          ...step,
+          sessionKey: `sess-api-${taskSlug}-${step.from}-${step.to}`,
+          updatedAt: startedAt + (stepIndex + 1) * 6 * 60_000,
+          totalTokens: 9000 + stepIndex * 2400 + index * 1700,
+          state: profile === 'completed'
+            ? 'completed'
+            : isCurrent
+              ? profile === 'waiting'
+                ? 'waiting'
+                : 'running'
+              : 'completed',
+        } as GeneratedTaskScenarioStep
+      })
+
+    return {
+      id: quickStart.id,
+      quickStart,
+      owner,
+      rootSessionKey,
+      rootUpdatedAt: startedAt,
+      rootTotalTokens: 32000 + roles.length * 1800 + index * 5400,
+      status: profile,
+      steps,
+    }
+  })
+}
+
 function buildSessions(
   summary: ExperiencePresetSummary,
   template: PresetTeamTemplate,
@@ -436,54 +534,56 @@ function buildSessions(
 ): SessionsListResult {
   const now = Date.now()
   const sessions: GatewaySessionRow[] = []
+  const taskScenarios = buildTaskScenarios(summary, template, roles)
 
-  summary.quickStarts.forEach((quickStart, index) => {
-    const owner = findRole(quickStart.ownerRoleId, roles)
-    const model = modelForTier(owner)
-    const totalTokens = 42000 + roles.length * 2600 + index * 8500
+  taskScenarios.forEach((scenario) => {
+    const ownerModel = modelForTier(scenario.owner)
     sessions.push({
-      key: `sess-${quickStart.channel}-${slug(quickStart.user)}-${owner.manifest.id}`,
+      key: scenario.rootSessionKey,
       kind: 'direct',
-      label: quickStart.title,
-      displayName: quickStart.user,
-      channel: quickStart.channel,
-      updatedAt: now - index * 14 * 60_000,
-      totalTokens,
-      inputTokens: Math.round(totalTokens * 0.44),
-      outputTokens: Math.round(totalTokens * 0.56),
-      model: model.model,
-      modelProvider: model.provider,
-      lastMessagePreview: quickStart.outcome,
+      label: scenario.quickStart.title,
+      displayName: scenario.quickStart.user,
+      channel: scenario.quickStart.channel,
+      updatedAt: scenario.rootUpdatedAt,
+      totalTokens: scenario.rootTotalTokens,
+      inputTokens: Math.round(scenario.rootTotalTokens * 0.44),
+      outputTokens: Math.round(scenario.rootTotalTokens * 0.56),
+      model: ownerModel.model,
+      modelProvider: ownerModel.provider,
+      lastMessagePreview: scenario.quickStart.outcome,
       sendPolicy: 'allow',
-      reasoningLevel: owner.manifest.modelTier,
+      reasoningLevel: scenario.owner.manifest.modelTier,
       contextTokens: 200000,
       responseUsage: 'full',
     })
-  })
 
-  template.workflow.forEach((step, index) => {
-    const fromRole = findRole(step.from, roles)
-    const toRole = findRole(step.to, roles)
-    const model = modelForTier(toRole)
-    const totalTokens = 18000 + index * 2400
-    sessions.push({
-      key: `sess-api-${fromRole.manifest.id}-${toRole.manifest.id}`,
-      kind: 'direct',
-      label: `${fromRole.manifest.name} → ${toRole.manifest.name}`,
-      displayName: fromRole.manifest.name,
-      channel: 'api',
-      updatedAt: now - (index + 1) * 8 * 60_000,
-      totalTokens,
-      inputTokens: Math.round(totalTokens * 0.4),
-      outputTokens: Math.round(totalTokens * 0.6),
-      model: model.model,
-      modelProvider: model.provider,
-      lastMessagePreview: `${step.condition} · ${step.mandatory ? '强制链路' : '按需链路'}`,
-      sendPolicy: 'allow',
-      thinkingLevel: step.mandatory ? 'deep' : 'standard',
-      reasoningLevel: toRole.manifest.modelTier,
-      contextTokens: 200000,
-      responseUsage: 'tokens',
+    scenario.steps.forEach((step) => {
+      const fromRole = findRole(step.from, roles)
+      const toRole = findRole(step.to, roles)
+      const model = modelForTier(toRole)
+      sessions.push({
+        key: step.sessionKey,
+        kind: 'direct',
+        label: `${scenario.quickStart.title} · ${fromRole.manifest.name} → ${toRole.manifest.name}`,
+        displayName: fromRole.manifest.name,
+        channel: 'api',
+        updatedAt: step.updatedAt,
+        totalTokens: step.totalTokens,
+        inputTokens: Math.round(step.totalTokens * 0.4),
+        outputTokens: Math.round(step.totalTokens * 0.6),
+        model: model.model,
+        modelProvider: model.provider,
+        lastMessagePreview: step.state === 'waiting'
+          ? `等待门禁：${step.condition}`
+          : step.state === 'running'
+            ? `正在推进：${step.condition}`
+            : `已完成：${step.condition}`,
+        sendPolicy: step.state === 'waiting' ? 'deny' : 'allow',
+        thinkingLevel: step.mandatory ? 'deep' : 'standard',
+        reasoningLevel: toRole.manifest.modelTier,
+        contextTokens: 200000,
+        responseUsage: 'tokens',
+      })
     })
   })
 
@@ -533,26 +633,39 @@ function buildLogs(
 ): LogEntry[] {
   const now = Date.now()
   const entries: LogEntry[] = []
+  const taskScenarios = buildTaskScenarios(summary, template, roles)
 
-  summary.quickStarts.forEach((quickStart, index) => {
+  taskScenarios.forEach((scenario, index) => {
     entries.push({
-      ts: now - index * 4 * 60_000,
+      ts: scenario.rootUpdatedAt,
       level: 'info',
-      source: `channel:${quickStart.channel}`,
-      message: `${quickStart.user} 发起场景：${quickStart.title}`,
-      raw: `[${new Date(now - index * 4 * 60_000).toISOString()}] INFO channel:${quickStart.channel}: ${quickStart.user} 发起场景：${quickStart.title}`,
+      source: `channel:${scenario.quickStart.channel}`,
+      message: `${scenario.quickStart.user} 发起场景：${scenario.quickStart.title}`,
+      raw: `[${new Date(scenario.rootUpdatedAt).toISOString()}] INFO channel:${scenario.quickStart.channel}: ${scenario.quickStart.user} 发起场景：${scenario.quickStart.title}`,
     })
-  })
 
-  template.workflow.forEach((step, index) => {
-    const fromRole = findRole(step.from, roles)
-    const toRole = findRole(step.to, roles)
+    scenario.steps.forEach((step) => {
+      const fromRole = findRole(step.from, roles)
+      const toRole = findRole(step.to, roles)
+      entries.push({
+        ts: step.updatedAt,
+        level: step.state === 'waiting' ? 'warn' : step.mandatory ? 'info' : 'debug',
+        source: `agent:${fromRole.manifest.id}`,
+        message: step.state === 'waiting'
+          ? `${scenario.quickStart.title} 等待 ${toRole.manifest.name} 门禁：${step.condition}`
+          : `已将任务移交给 ${toRole.manifest.name}：${step.condition}`,
+        raw: `[${new Date(step.updatedAt).toISOString()}] ${step.state === 'waiting' ? 'WARN' : 'INFO'} agent:${fromRole.manifest.id}: ${step.state === 'waiting' ? `${scenario.quickStart.title} 等待 ${toRole.manifest.name} 门禁：${step.condition}` : `已将任务移交给 ${toRole.manifest.name}：${step.condition}`}`,
+      })
+    })
+
     entries.push({
-      ts: now - (index + 1) * 6 * 60_000,
-      level: step.mandatory ? 'info' : 'debug',
-      source: `agent:${fromRole.manifest.id}`,
-      message: `已将任务移交给 ${toRole.manifest.name}：${step.condition}`,
-      raw: `[${new Date(now - (index + 1) * 6 * 60_000).toISOString()}] INFO agent:${fromRole.manifest.id}: 已将任务移交给 ${toRole.manifest.name}：${step.condition}`,
+      ts: now - index * 3 * 60_000,
+      level: scenario.status === 'completed' ? 'info' : 'debug',
+      source: `agent:${scenario.owner.manifest.id}`,
+      message: scenario.status === 'completed'
+        ? `${scenario.quickStart.title} 已形成可交付结果`
+        : `${scenario.quickStart.title} 当前由 ${scenario.owner.manifest.name} 继续推进`,
+      raw: `[${new Date(now - index * 3 * 60_000).toISOString()}] INFO agent:${scenario.owner.manifest.id}: ${scenario.status === 'completed' ? `${scenario.quickStart.title} 已形成可交付结果` : `${scenario.quickStart.title} 当前由 ${scenario.owner.manifest.name} 继续推进`}`,
     })
   })
 
@@ -639,19 +752,18 @@ function buildNodes(summary: ExperiencePresetSummary, roles: PresetRoleDetail[])
   ]
 }
 
-function buildExecApprovals(template: PresetTeamTemplate): ExecApprovalRequest[] {
-  const now = Date.now()
-  return template.workflow
-    .filter((step) => step.mandatory)
-    .slice(0, 2)
-    .map((step, index) => ({
-      id: `approval-${template.id}-${index + 1}`,
-      sessionKey: `sess-api-${step.from}-${step.to}`,
-      agentId: step.to,
-      tool: 'workflow',
-      description: `等待 ${step.to} 确认：${step.condition}`,
-      ts: now - (index + 1) * 5 * 60_000,
-    }))
+function buildExecApprovals(taskScenarios: GeneratedTaskScenario[]): ExecApprovalRequest[] {
+  return taskScenarios
+    .flatMap((scenario, scenarioIndex) => scenario.steps
+      .filter((step) => step.state === 'waiting')
+      .map((step, stepIndex) => ({
+        id: `approval-${slug(scenario.id)}-${stepIndex + 1}`,
+        sessionKey: step.sessionKey,
+        agentId: step.to,
+        tool: 'workflow',
+        description: `等待 ${step.to} 确认：${step.condition}`,
+        ts: step.updatedAt + (scenarioIndex + 1) * 30_000,
+      })))
 }
 
 function buildPresence(summary: ExperiencePresetSummary): PresenceEntry[] {
@@ -694,6 +806,7 @@ function buildSnapshot(summary: ExperiencePresetSummary, presence: PresenceEntry
 
 function buildExperienceState(experience: LoadedExperiencePreset): MockWorkspaceSeed {
   const meta = presetMeta(experience.summary.id, experience.template)
+  const taskScenarios = buildTaskScenarios(experience.summary, experience.template, experience.roles)
   const { agents, agentFiles } = buildAgents(experience.roles)
   const channelsStatus = buildChannels(experience.summary)
   const sessionsList = buildSessions(experience.summary, experience.template, experience.roles)
@@ -702,7 +815,7 @@ function buildExperienceState(experience: LoadedExperiencePreset): MockWorkspace
   const logs = buildLogs(experience.summary, experience.template, experience.roles)
   const skills = buildSkills(experience.manifest, experience.roles)
   const nodes = buildNodes(experience.summary, experience.roles)
-  const execApprovals = buildExecApprovals(experience.template)
+  const execApprovals = buildExecApprovals(taskScenarios)
   const presence = buildPresence(experience.summary)
   const snapshot = buildSnapshot(experience.summary, presence, channelsStatus)
 

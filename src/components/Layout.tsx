@@ -1,6 +1,8 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { useState, useRef, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { loadConfig, MODE_LABELS } from '../lib/config'
+import { getAPI } from '../lib/api'
+import { getGatewayClient } from '../lib/gateway-client'
 
 const navItems = [
   { path: '/', label: '总览', icon: '📊' },
@@ -32,23 +34,32 @@ export default function Layout() {
   const config = loadConfig()
   const modeInfo = MODE_LABELS[config.mode]
 
-  // Auto-refresh
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [countdown, setCountdown] = useState(config.refreshInterval)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [approvalCount, setApprovalCount] = useState(0)
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 清理刷新动画定时器
+  const loadApprovalCount = useCallback(async () => {
+    try {
+      const approvals = await getAPI().getExecApprovals()
+      setApprovalCount(approvals.length)
+    } catch {
+      setApprovalCount(0)
+    }
+  }, [])
+
   useEffect(() => {
     return () => { if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current) }
   }, [])
 
-  const triggerRefresh = () => {
+  const triggerRefresh = useCallback(() => {
     setIsRefreshing(true)
-    setRefreshKey(k => k + 1)
+    setRefreshKey((key) => key + 1)
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
     refreshTimerRef.current = setTimeout(() => setIsRefreshing(false), 600)
-  }
+    void loadApprovalCount()
+  }, [loadApprovalCount])
 
   useEffect(() => {
     if (!autoRefresh) {
@@ -56,7 +67,7 @@ export default function Layout() {
       return
     }
     const timer = setInterval(() => {
-      setCountdown(prev => {
+      setCountdown((prev) => {
         if (prev <= 1) {
           triggerRefresh()
           return config.refreshInterval
@@ -65,13 +76,30 @@ export default function Layout() {
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [autoRefresh, config.refreshInterval])
+  }, [autoRefresh, config.refreshInterval, triggerRefresh])
+
+  useEffect(() => {
+    void loadApprovalCount()
+    const timer = setInterval(() => {
+      void loadApprovalCount()
+    }, 15000)
+    const client = getGatewayClient()
+    const unsubs = client
+      ? [
+          client.on('exec.approval.requested', () => { void loadApprovalCount() }),
+          client.on('exec.approval.resolved', () => { void loadApprovalCount() }),
+        ]
+      : []
+
+    return () => {
+      clearInterval(timer)
+      unsubs.forEach((unsubscribe) => unsubscribe())
+    }
+  }, [loadApprovalCount])
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface-bg">
-      {/* Sidebar */}
       <aside className="w-60 flex-shrink-0 bg-surface-sidebar border-r border-surface-border shadow-sidebar flex flex-col">
-        {/* Logo */}
         <div className="p-5 border-b border-surface-divider">
           <h1 className="text-xl font-bold gradient-text tracking-wide">
             claw-ops
@@ -79,7 +107,6 @@ export default function Layout() {
           <p className="text-xs text-text-muted mt-1">OpenClaw Operations Dashboard</p>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => (
             <NavLink
@@ -96,11 +123,15 @@ export default function Layout() {
             >
               <span className="text-base">{item.icon}</span>
               <span>{item.label}</span>
+              {item.path === '/' && approvalCount > 0 && (
+                <span className="ml-auto rounded-full bg-pastel-yellow/80 px-2 py-0.5 text-[10px] font-semibold text-accent-yellow">
+                  {approvalCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
 
-        {/* System status */}
         <div className="p-4 border-t border-surface-divider">
           <NavLink
             to="/setup"
@@ -119,13 +150,17 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar */}
         <header className="h-14 flex-shrink-0 bg-surface-card border-b border-surface-border shadow-topbar flex items-center justify-between px-6">
-          <h2 className="text-base font-semibold text-text-primary">{title}</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-semibold text-text-primary">{title}</h2>
+            {approvalCount > 0 && (
+              <span className="rounded-full bg-pastel-yellow/80 px-2.5 py-1 text-[11px] font-semibold text-accent-yellow">
+                🔒 {approvalCount} 待审批
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
-            {/* Auto-refresh toggle */}
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors ${
@@ -148,7 +183,6 @@ export default function Layout() {
           </div>
         </header>
 
-        {/* Page content */}
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet key={refreshKey} />
         </main>

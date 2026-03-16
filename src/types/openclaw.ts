@@ -309,6 +309,44 @@ export interface SessionsDeleteParams {
 }
 
 // ==========================================
+// Chat 类型
+// ==========================================
+
+export interface ChatAttachment {
+  name?: string
+  mimeType?: string
+  size?: number
+  url?: string
+}
+
+export interface ChatSendParams {
+  sessionKey: string
+  text: string
+  attachments?: ChatAttachment[]
+  agentId?: string
+  channel?: string
+  to?: string
+  model?: string
+  maxTokens?: number
+  thinking?: boolean
+  parentId?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant' | 'tool' | 'system' | 'other'
+  text: string
+  timestamp?: number
+  modelUsage?: {
+    input_tokens?: number
+    output_tokens?: number
+    cost?: number
+  }
+  attachments?: ChatAttachment[]
+}
+
+// ==========================================
 // Usage / Cost 类型
 // ==========================================
 
@@ -621,6 +659,8 @@ export type GatewayEventType =
   | 'voicewake.changed'
   | 'exec.approval.requested'
   | 'exec.approval.resolved'
+  | 'session.update'
+  | 'agent.status'
   | 'update.available'
 
 export interface AgentEvent {
