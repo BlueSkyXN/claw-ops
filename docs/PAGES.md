@@ -4,13 +4,13 @@
 
 | 序号 | 页面 | 路径 | 核心功能 | 数据来源 (JSON-RPC) |
 |------|------|------|----------|---------------------|
-| 1 | 总览 | `/` | KPI + 编排健康条 + 任务控制面 + 趋势图 + 最近会话 | `agents.list` `sessions.list` `sessions.usage` `channels.status` `logs.tail` `exec.approvals.get` |
+| 1 | 总览 | `/` | CEO 发令台 + KPI + 编排健康条 + 经营绩效板 + 任务控制面 + 趋势图 + 最近会话 | `agents.list` `sessions.list` `sessions.usage` `channels.status` `logs.tail` `exec.approvals.get` `chat.send` |
 | 2 | 智能体 | `/agents` | 智能体卡片 + 创建/删除 | `agents.list` `agents.create` `agents.delete` |
 | 3 | 会话 | `/sessions` | 会话表格 + 筛选 + 详情 + 操作 | `sessions.list` `sessions.reset` `sessions.delete` |
 | 4 | 渠道 | `/channels` | 渠道连接状态 + 账户详情 | `channels.status` |
 | 5 | 定时任务 | `/cron` | Cron CRUD + 运行日志 + 手动触发 | `cron.list` `cron.add` `cron.update` `cron.remove` `cron.run` `cron.runs` |
 | 6 | 用量分析 | `/usage` | Token/费用趋势 + 多维聚合 | `sessions.usage` |
-| 7 | 编排控制面 | `/orchestration` | 任务追踪 + 路径高亮 + 审批门禁 + 干预动作 + 通道拓扑 + 组织架构 | `sessions.list` `sessions.patch` `sessions.reset` `sessions.usage` `channels.status` `logs.tail` `exec.approvals.get` `exec.approval.resolve` `chat.send` |
+| 7 | 编排控制面 | `/orchestration` | Mission 发令 + 任务追踪 + 路径高亮 + 活策略面板 + 审批门禁 + 干预动作 + 通道拓扑 + 组织架构 | `sessions.list` `sessions.patch` `sessions.reset` `sessions.usage` `channels.status` `logs.tail` `exec.approvals.get` `exec.approval.resolve` `chat.send` |
 | 8 | 拓扑 | `/topology` | 兼容旧入口，重定向到编排控制面 | — |
 | 9 | 日志 | `/logs` | 实时日志 + 筛选 + 导出 | `logs.tail` |
 | 10 | 配置 | `/setup` | 4 步配置向导 | `health`（连接测试） |
@@ -32,6 +32,15 @@
 #### 编排健康条
 - 显示编排健康分、层级覆盖、吞吐、瓶颈和成本建议
 - 直接链接到 `/orchestration`
+
+#### CEO 发令台
+- 主动填写 Mission 标题、目标简报、成功标准、负责人、优先级与入口渠道
+- 通过 `chat.send` 将目标直接投递给组织负责人
+- 复用 quick start 场景快速起草经营动作
+
+#### 经营绩效板
+- 把运行态指标翻译为吞吐、治理压力、组织热点、交付风险
+- 展示热点角色榜与容量比，面向管理者而不是纯技术监控
 
 #### 运行态任务列表
 - 展示任务状态、当前负责角色、审批积压、token 消耗和步骤时间线
@@ -229,9 +238,14 @@
 - 与总览共用的编排健康条
 
 #### 任务控制侧栏
+- 紧凑版 Mission 发令台
 - 活跃任务卡片列表
 - 任务步骤时间线
 - 快速干预：暂停、恢复、催办、重置、审批通过/驳回、重派
+
+#### 活策略面板
+- 把 `workflow / authority / capabilities` 从静态配置变成运行态治理解释
+- 展示并发上限、审批压力、升级路径、门禁状态与执行能力边界
 
 #### 三种可视化视图
 - **执行图谱**：高亮当前任务路径、门禁和交付归并

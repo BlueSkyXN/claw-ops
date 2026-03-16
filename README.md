@@ -2,7 +2,7 @@
 
 **OpenClaw Operations Dashboard — OpenClaw 企业级编排控制面**
 
-OpenClaw Gateway 的配套运维可视化前端（纯前端 SPA）。通过 WebSocket JSON-RPC (OpenClaw 协议) 连接 OpenClaw 网关，提供智能体管理、会话监控、渠道状态、定时任务、用量分析、日志查看，以及面向企业组织的编排控制面：任务追踪、路径高亮、审批门禁、干预动作与健康分析。
+OpenClaw Gateway 的配套运维可视化前端（纯前端 SPA）。通过 WebSocket JSON-RPC (OpenClaw 协议) 连接 OpenClaw 网关，提供智能体管理、会话监控、渠道状态、定时任务、用量分析、日志查看，以及面向企业组织的编排控制面：Mission 发令、任务追踪、路径高亮、审批门禁、活策略面板、干预动作与健康分析。
 
 > 🎨 马卡龙清新配色 · 🔌 WebSocket JSON-RPC · 🤖 智能体管理 · 💬 会话监控 · 📡 渠道状态 · ⏰ 定时任务 · 📈 用量分析 · 🧩 编排工作台 · 📜 实时日志
 
@@ -10,13 +10,13 @@ OpenClaw Gateway 的配套运维可视化前端（纯前端 SPA）。通过 WebS
 
 | 页面 | 功能说明 |
 |------|----------|
-| 📊 **总览** (Dashboard) | KPI 指标卡（活跃任务/待审批/渠道/费用）、编排健康条、任务列表、用量趋势、模型分布、最近会话 |
+| 📊 **总览** (Dashboard) | CEO 发令台、KPI 指标卡、编排健康条、经营绩效板、任务列表、用量趋势、模型分布、最近会话 |
 | 🤖 **智能体** (Agents) | 智能体卡片网格（模型/供应商/工作区）、创建智能体、删除智能体 |
 | 💬 **会话** (Sessions) | 会话列表表格（渠道/类型/Token 用量）、筛选搜索、会话详情、重置/删除操作 |
 | 📡 **渠道** (Channels) | 渠道连接状态、账户列表、4 态状态灯（configured/linked/running/connected）、出入站活动时间 |
 | ⏰ **定时任务** (CronJobs) | Cron 任务 CRUD、调度类型（at/every/cron）、运行日志、手动触发 |
 | 📈 **用量分析** (Usage) | Token 消耗/费用趋势图、按模型/供应商/智能体/渠道/日期聚合、Top 20 会话 |
-| 🧩 **编排** (Orchestration) | 企业级编排控制面：任务追踪、路径高亮、审批门禁、暂停/催办/重派、通道拓扑、组织架构 |
+| 🧩 **编排** (Orchestration) | 企业级编排控制面：Mission 发令、任务追踪、路径高亮、活策略面板、审批门禁、暂停/催办/重派、通道拓扑、组织架构 |
 | 📜 **日志** (Logs) | 实时日志流、级别/来源筛选、自动滚动、CSV 导出 |
 | ⚙️ **配置** (Setup) | 4 步配置向导：模式选择 → 网关地址与认证 → 连接测试 → 完成 |
 
@@ -67,7 +67,8 @@ npm run preview
 
 1. 启动 `npm run dev` 或 `npm run dev:demo`
 2. 打开首页，直接点击 `🚀 一键导入 OPC 超级助理`
-3. 进入 `🧩 编排` 页面，查看任务追踪、执行路径、审批门禁、通道拓扑 / 组织架构三种视图
+3. 通过 `📊 总览` 或 `🧩 编排` 页面上的 Mission 发令台主动下达经营目标
+4. 进入 `🧩 编排` 页面，查看任务追踪、执行路径、审批门禁、通道拓扑 / 组织架构三种视图
 4. 打开 `🤖 智能体` 页面，可继续使用现有预设角色库按角色补强团队
 
 ### 连接真实 OpenClaw Gateway
@@ -117,6 +118,9 @@ npm run preview
 - **`src/lib/flow-tracer.ts`** — 执行路径高亮与节点/边状态映射
 - **`src/lib/health-analyzer.ts`** — 编排健康分析（覆盖度、吞吐、延迟、瓶颈、成本）
 - **`src/lib/orchestration-runtime.ts`** — 编排控制面运行时装配、事件订阅与干预动作封装
+- **`src/components/MissionDispatchPanel.tsx`** — CEO 发令台：主动下达 Mission / Goal Brief
+- **`src/components/ExecutivePerformanceBoard.tsx`** — 经营绩效板：吞吐、治理压力、热点角色、交付风险
+- **`src/components/RoleOperatingPolicyPanel.tsx`** — 活策略面板：Authority / Workflow / Capability 的运行态解释
 
 ## 🛠️ 技术栈
 
@@ -162,18 +166,21 @@ src/
 ├── components/
 │   ├── Layout.tsx           # 共享 Shell（侧边栏 8 项 + 顶栏 + 自动刷新 + Outlet）
 │   ├── ActiveTasksPanel.tsx # 任务卡片与内联控制
+│   ├── ExecutivePerformanceBoard.tsx # 经营绩效板
 │   ├── QuickStartBanner.tsx # 首页 OPC 一键体验 Banner
+│   ├── MissionDispatchPanel.tsx # CEO 发令台
 │   ├── OrchestratorHealthStrip.tsx # 编排健康条
+│   ├── RoleOperatingPolicyPanel.tsx # 活策略面板
 │   ├── TaskStepTimeline.tsx # 任务步骤时间线
 │   └── TeamPresetsPanel.tsx # 团队模板浏览器
 ├── pages/
-│   ├── Dashboard.tsx        # 总览（KPI + 趋势 + 模型分布 + 最近会话）
+│   ├── Dashboard.tsx        # 总览（CEO 发令台 + 经营绩效 + 任务控制）
 │   ├── Agents.tsx           # 智能体管理（卡片 + 创建/删除）
 │   ├── Sessions.tsx         # 会话管理（表格 + 筛选 + 详情 + 重置/删除）
 │   ├── Channels.tsx         # 渠道状态（渠道卡片 + 账户详情 + 4 态状态灯）
 │   ├── CronJobs.tsx         # 定时任务（CRUD + 运行日志 + 手动触发）
 │   ├── Usage.tsx            # 用量分析（日期范围 + 多维聚合 + 图表）
-│   ├── Orchestration.tsx    # 编排工作台（工作流图谱 / 通道拓扑 / 组织架构）
+│   ├── Orchestration.tsx    # 编排控制面（Mission 发令 / 图谱 / 活策略 / 拓扑）
 │   ├── Topology.tsx         # 兼容旧拓扑页（已重定向到编排页）
 │   ├── Logs.tsx             # 日志查看（筛选 + 自动滚动 + CSV 导出）
 │   └── Setup.tsx            # 配置向导（4 步：模式→网关→测试→完成）

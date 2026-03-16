@@ -620,7 +620,11 @@ export function sendMockChatMessage(params: ChatSendParams): ChatMessage[] {
           label: typeof params.metadata?.taskTitle === 'string'
             ? params.metadata.taskTitle
             : `控制操作 · ${targetAgentId}`,
-          displayName: typeof params.to === 'string' ? params.to : targetAgentId,
+          displayName: typeof params.metadata?.originUser === 'string'
+            ? params.metadata.originUser
+            : typeof params.to === 'string'
+              ? params.to
+              : targetAgentId,
           channel: params.channel ?? (params.sessionKey.startsWith('sess-api-') ? 'api' : 'web'),
           updatedAt: now,
           totalTokens: tokenDelta,

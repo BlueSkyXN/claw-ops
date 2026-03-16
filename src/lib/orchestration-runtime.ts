@@ -34,6 +34,15 @@ export interface OrchestrationRuntime {
   health: OrchestrationHealth | null
 }
 
+export interface MissionDispatchInput {
+  title: string
+  brief: string
+  successCriteria: string
+  ownerRoleId: string
+  priority: 'normal' | 'high' | 'critical'
+  channel: string
+}
+
 export type TaskInterventionAction =
   | { kind: 'pause'; task: TrackedTask }
   | { kind: 'resume'; task: TrackedTask }
@@ -155,6 +164,21 @@ function buildControlMessage(task: TrackedTask, action: 'nudge' | 'reroute', tar
   return `[claw-ops orchestration control] 请接手任务「${task.title}」，并基于现有上下文继续推进。当前负责角色：${task.currentAgentName ?? task.ownerRoleName ?? '未指定'}。重派目标：${targetRoleId ?? '未指定'}。`
 }
 
+function buildMissionDispatchMessage(input: MissionDispatchInput): string {
+  return [
+    '[claw-ops executive mission]',
+    `任务：${input.title}`,
+    `目标：${input.brief}`,
+    `成功标准：${input.successCriteria}`,
+    `优先级：${input.priority}`,
+    '请立即接单，拆解执行路径，识别阻塞项，并持续同步阶段性进展、风险与下一步动作。',
+  ].join('\n')
+}
+
+function buildMissionSessionKey(input: MissionDispatchInput): string {
+  return `sess-${input.channel}-dispatch-${slug(input.title)}-${Date.now()}-${input.ownerRoleId}`
+}
+
 function buildRerouteParams(task: TrackedTask, targetRoleId: string): ChatSendParams {
   const fromRoleId = task.currentAgentId ?? task.ownerRoleId ?? targetRoleId
   return {
@@ -171,6 +195,25 @@ function buildRerouteParams(task: TrackedTask, targetRoleId: string): ChatSendPa
       targetRoleId,
     },
   }
+}
+
+export async function dispatchMission(input: MissionDispatchInput): Promise<void> {
+  const api = getAPI()
+  const sessionKey = buildMissionSessionKey(input)
+  await api.sendChatMessage({
+    sessionKey,
+    text: buildMissionDispatchMessage(input),
+    agentId: input.ownerRoleId,
+    channel: input.channel,
+    metadata: {
+      controlAction: 'mission-dispatch',
+      taskTitle: input.title,
+      missionPriority: input.priority,
+      successCriteria: input.successCriteria,
+      ownerRoleId: input.ownerRoleId,
+      originUser: 'CEO',
+    },
+  })
 }
 
 export async function performTaskIntervention(action: TaskInterventionAction): Promise<void> {

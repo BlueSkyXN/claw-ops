@@ -26,12 +26,14 @@ import {
   type ExperienceQuickStart,
 } from '../lib/orchestration'
 import { buildExecutionTrace, type ExecutionTrace } from '../lib/flow-tracer'
-import { loadOrchestrationRuntime, performTaskIntervention, subscribeToOrchestrationEvents, isExperienceSummary } from '../lib/orchestration-runtime'
+import { dispatchMission, loadOrchestrationRuntime, performTaskIntervention, subscribeToOrchestrationEvents, isExperienceSummary, type MissionDispatchInput } from '../lib/orchestration-runtime'
 import { buildRoleLoadMap, type RoleLoadInfo, type TrackedTask } from '../lib/task-tracker'
 import type { PresetRoleDetail } from '../lib/presets'
 import ActiveTasksPanel, { type ActiveTaskPanelAction } from '../components/ActiveTasksPanel'
 import AgentLayerBadge from '../components/AgentLayerBadge'
+import MissionDispatchPanel from '../components/MissionDispatchPanel'
 import OrchestratorHealthStrip from '../components/OrchestratorHealthStrip'
+import RoleOperatingPolicyPanel from '../components/RoleOperatingPolicyPanel'
 import TaskStepTimeline from '../components/TaskStepTimeline'
 import TeamPresetsPanel from '../components/TeamPresetsPanel'
 
@@ -237,6 +239,10 @@ function SummaryNode({ data }: { data: SummaryNodeData }) {
 
 function RoleNode({ data }: { data: RoleNodeData }) {
   const tone = getRoleLayerTone(data.role.manifest.layer)
+  const queue = data.load.activeTasks + data.load.waitingTasks + data.load.blockedTasks
+  const capacity = Math.max(1, data.role.authority.maxConcurrent || data.role.manifest.defaultMaxConcurrent || 1)
+  const isOverloaded = queue > capacity
+  const canEscalate = data.role.authority.escalateTo.length > 0 && (data.load.waitingTasks + data.load.blockedTasks > 0)
   const traceBorder = data.traceState === 'active'
     ? '#3b82f6'
     : data.traceState === 'completed'
@@ -279,7 +285,9 @@ function RoleNode({ data }: { data: RoleNodeData }) {
           <AgentLayerBadge layer={data.role.manifest.layer} />
           <span className="badge badge-blue">{data.role.manifest.modelTier}</span>
           <span className="badge badge-purple">{data.role.manifest.costTier}</span>
+          {isOverloaded && <span className="badge badge-red">过载</span>}
           {data.load.pendingApprovals > 0 && <span className="badge badge-yellow">{data.load.pendingApprovals} 审批</span>}
+          {canEscalate && <span className="badge badge-cyan">可升级</span>}
         </div>
         <div className="grid grid-cols-2 gap-2 text-[11px] text-text-secondary">
           <div>
@@ -667,34 +675,7 @@ function DetailPanel({ detail }: { detail: SelectedDetail | null }) {
         {detail.load.pendingApprovals > 0 && <span className="badge badge-yellow">{detail.load.pendingApprovals} 审批</span>}
       </div>
       <p className="text-xs text-text-primary leading-6">{detail.role.manifest.description}</p>
-      <div className="grid grid-cols-1 gap-3 text-xs">
-        <div className="rounded-2xl border border-surface-border bg-surface-bg p-4 space-y-2">
-          <p className="font-semibold text-text-secondary">工作流阶段</p>
-          <p className="text-text-primary">{detail.role.workflow.ownedStages.join(' · ') || '—'}</p>
-        </div>
-        <div className="rounded-2xl border border-surface-border bg-surface-bg p-4 space-y-2">
-          <p className="font-semibold text-text-secondary">上游 / 下游</p>
-          <p className="text-text-primary">接收：{detail.role.workflow.acceptsFrom.join('、') || '—'}</p>
-          <p className="text-text-primary">移交：{detail.role.workflow.handoffTo.join('、') || '—'}</p>
-        </div>
-        <div className="rounded-2xl border border-surface-border bg-surface-bg p-4 space-y-2">
-          <p className="font-semibold text-text-secondary">强制检查</p>
-          <p className="text-text-primary">{detail.role.workflow.mandatoryChecks.join('、') || '—'}</p>
-        </div>
-        <div className="rounded-2xl border border-surface-border bg-surface-bg p-4 space-y-2">
-          <p className="font-semibold text-text-secondary">运行负载</p>
-          <p className="text-text-primary">执行中：{detail.load.activeTasks} · 待处理：{detail.load.waitingTasks + detail.load.blockedTasks}</p>
-          <p className="text-text-primary">已完成：{detail.load.completedTasks} · 失败：{detail.load.failedTasks}</p>
-        </div>
-        <div className="rounded-2xl border border-surface-border bg-surface-bg p-4 space-y-2">
-          <p className="font-semibold text-text-secondary">必需技能</p>
-          <div className="flex flex-wrap gap-1.5">
-            {detail.role.capabilities.requiredSkills.map((skill) => (
-              <span key={skill} className="badge badge-cyan">{skill}</span>
-            ))}
-          </div>
-        </div>
-      </div>
+      <RoleOperatingPolicyPanel role={detail.role} load={detail.load} />
     </div>
   )
 }
@@ -800,6 +781,7 @@ export default function Orchestration() {
   const [selectedDetail, setSelectedDetail] = useState<SelectedDetail | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [actionBusyKey, setActionBusyKey] = useState<string | null>(null)
+  const [missionBusy, setMissionBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
@@ -981,6 +963,22 @@ export default function Orchestration() {
       setError(err instanceof Error ? err.message : '控制动作执行失败')
     } finally {
       setActionBusyKey(null)
+    }
+  }, [loadRuntime, selectedTemplateId])
+
+  const handleMissionDispatch = useCallback(async (input: MissionDispatchInput) => {
+    setMissionBusy(true)
+    setError(null)
+    try {
+      await dispatchMission(input)
+      if (selectedTemplateId) {
+        await loadRuntime(selectedTemplateId)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Mission 下达失败')
+      throw err
+    } finally {
+      setMissionBusy(false)
     }
   }, [loadRuntime, selectedTemplateId])
 
@@ -1193,6 +1191,17 @@ export default function Orchestration() {
 
         {!focusMode && (
           <div className="space-y-4 sticky top-6">
+            <MissionDispatchPanel
+              compact
+              title="Mission 发令台"
+              subtitle={activePreset ? `当前向 ${activePreset.summary.name} 下达目标与经营动作。` : '先激活团队，再向组织负责人发起 Mission。'}
+              roles={activePreset?.roles ?? []}
+              quickStarts={activePreset?.summary.quickStarts ?? []}
+              channelsStatus={runtime?.channels ?? null}
+              busy={missionBusy}
+              disabledReason={activePreset ? null : '当前没有运行中的企业编排团队，无法投递 Mission。'}
+              onDispatch={handleMissionDispatch}
+            />
             <ActiveTasksPanel
               title="运行态任务"
               subtitle={activePreset ? `当前控制面观测 ${activePreset.summary.name}` : '尚未激活运行中的企业编排团队'}

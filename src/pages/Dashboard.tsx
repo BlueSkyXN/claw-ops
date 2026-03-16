@@ -3,10 +3,12 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useNavigate } from 'react-router-dom'
 import type { ActiveTaskPanelAction } from '../components/ActiveTasksPanel'
 import ActiveTasksPanel from '../components/ActiveTasksPanel'
+import ExecutivePerformanceBoard from '../components/ExecutivePerformanceBoard'
+import MissionDispatchPanel from '../components/MissionDispatchPanel'
 import OrchestratorHealthStrip from '../components/OrchestratorHealthStrip'
 import QuickStartBanner from '../components/QuickStartBanner'
 import { importExperiencePreset } from '../lib/orchestration'
-import { loadOrchestrationRuntime, performTaskIntervention, subscribeToOrchestrationEvents } from '../lib/orchestration-runtime'
+import { dispatchMission, loadOrchestrationRuntime, performTaskIntervention, subscribeToOrchestrationEvents, type MissionDispatchInput } from '../lib/orchestration-runtime'
 import type { TrackedTask } from '../lib/task-tracker'
 
 const ChartTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; name: string; color: string }>; label?: string }) => {
@@ -69,6 +71,7 @@ export default function Dashboard() {
   const [runtime, setRuntime] = useState<Awaited<ReturnType<typeof loadOrchestrationRuntime>> | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [actionBusyKey, setActionBusyKey] = useState<string | null>(null)
+  const [missionBusy, setMissionBusy] = useState(false)
   const [importingPreset, setImportingPreset] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -142,6 +145,20 @@ export default function Dashboard() {
       setError(err instanceof Error ? err.message : '任务操作失败')
     } finally {
       setActionBusyKey(null)
+    }
+  }, [loadData])
+
+  const handleMissionDispatch = useCallback(async (input: MissionDispatchInput) => {
+    setMissionBusy(true)
+    setError(null)
+    try {
+      await dispatchMission(input)
+      await loadData(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Mission 下达失败')
+      throw err
+    } finally {
+      setMissionBusy(false)
     }
   }, [loadData])
 
@@ -248,6 +265,15 @@ export default function Dashboard() {
         />
       )}
 
+      <MissionDispatchPanel
+        roles={runtime?.activeExperiencePreset?.roles ?? []}
+        quickStarts={runtime?.activeExperiencePreset?.summary.quickStarts ?? []}
+        channelsStatus={runtime?.channels ?? null}
+        busy={missionBusy}
+        disabledReason={runtime?.activeExperiencePreset ? null : '先导入并激活企业编排团队，才能把 Mission 投递给组织负责人。'}
+        onDispatch={handleMissionDispatch}
+      />
+
       <div className="grid grid-cols-4 gap-4">
         {statCards.map((stat) => (
           <div key={stat.label} className="stat-card">
@@ -268,6 +294,13 @@ export default function Dashboard() {
       </div>
 
       <OrchestratorHealthStrip experience={runtime?.experience ?? null} health={runtime?.health ?? null} taskSummary={runtime?.taskSummary ?? null} />
+
+      <ExecutivePerformanceBoard
+        activePreset={runtime?.activeExperiencePreset ?? null}
+        tasks={runtime?.tasks ?? []}
+        taskSummary={runtime?.taskSummary ?? null}
+        health={runtime?.health ?? null}
+      />
 
       <ActiveTasksPanel
         title="运行中任务"

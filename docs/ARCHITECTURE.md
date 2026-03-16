@@ -23,7 +23,8 @@
 │  ┌─────────────────────────────────────▼──────────────────┐  │
 │  │          Orchestration Runtime Semantic Layer          │  │
 │  │  task-tracker → flow-tracer → health-analyzer         │  │
-│  │  orchestration-runtime 负责装配、事件刷新和干预动作     │  │
+│  │  orchestration-runtime 负责装配、事件刷新、Mission 发令 │  │
+│  │  和干预动作                                             │  │
 │  └─────────────────────────────────────┬──────────────────┘  │
 └────────────────────────────────────────┼─────────────────────┘
                                          │ ws://
@@ -61,7 +62,10 @@ claw-ops/
 │   ├── components/
 │   │   ├── Layout.tsx           # 共享布局（侧边栏 + 顶栏 + Outlet）
 │   │   ├── ActiveTasksPanel.tsx # 任务卡片与内联控制
+│   │   ├── ExecutivePerformanceBoard.tsx # 经营绩效板
+│   │   ├── MissionDispatchPanel.tsx # CEO 发令台
 │   │   ├── OrchestratorHealthStrip.tsx # 编排健康条
+│   │   ├── RoleOperatingPolicyPanel.tsx # 活策略面板
 │   │   └── TaskStepTimeline.tsx # 任务步骤时间线
 │   ├── pages/
 │   │   ├── Dashboard.tsx        # 总览
