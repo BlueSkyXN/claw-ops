@@ -37,6 +37,9 @@ function formatConnectionErrorMessage(rawMessage: string): string {
     }
     return '连接失败：客户端握手参数不符合 Gateway 协议。请升级 claw-ops 或检查握手配置后重试。'
   }
+  if (message.includes('protocol mismatch')) {
+    return '连接失败：claw-ops 与当前 OpenClaw Gateway 的协议版本不兼容。请升级到兼容同一协议版本的 claw-ops / Gateway 后重试。'
+  }
   return `连接失败：${message}`
 }
 

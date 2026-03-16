@@ -14,7 +14,7 @@ import type {
   PresenceEntry,
 } from '../types/openclaw'
 
-const PROTOCOL_VERSION = 1
+const PROTOCOL_VERSION = 3
 const DEFAULT_GATEWAY_CLIENT_ID: GatewayClientId = 'openclaw-control-ui'
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -60,7 +60,7 @@ export class GatewayClient {
       scopes: ['operator.read', 'operator.write'],
       clientName: DEFAULT_GATEWAY_CLIENT_ID,
       clientDisplayName: 'claw-ops',
-      clientMode: 'ui',
+      clientMode: 'webchat',
       instanceId: crypto.randomUUID(),
       reconnect: true,
       reconnectInterval: 3000,
@@ -214,10 +214,11 @@ export class GatewayClient {
         id: this.options.clientName ?? DEFAULT_GATEWAY_CLIENT_ID,
         displayName: this.options.clientDisplayName,
         version: '0.1.0',
-        platform: navigator.platform,
-        mode: this.options.clientMode || 'ui',
+        platform: 'web',
+        mode: this.options.clientMode || 'webchat',
         instanceId: this.options.instanceId,
       },
+      role: 'operator',
       scopes: this.options.scopes,
     }
     // 认证信息嵌套在 auth 对象中
