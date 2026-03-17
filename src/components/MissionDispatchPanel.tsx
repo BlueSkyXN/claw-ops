@@ -29,18 +29,26 @@ export default function MissionDispatchPanel({
   quickStarts,
   compact = false,
   busy = false,
+  activationBusy = false,
   disabledReason = null,
   title = 'CEO 发令台',
   subtitle = '直接向组织下达目标，统一从控制面入口发起，让编排从观察走向主动驱动。',
+  activationLabel = '先激活团队',
+  activationHint = '激活后会保留当前已填写的 Mission 草稿。',
+  onActivate,
   onDispatch,
 }: {
   roles: PresetRoleDetail[]
   quickStarts: ExperienceQuickStart[]
   compact?: boolean
   busy?: boolean
+  activationBusy?: boolean
   disabledReason?: string | null
   title?: string
   subtitle?: string
+  activationLabel?: string
+  activationHint?: string
+  onActivate?: (() => Promise<void> | void) | null
   onDispatch: (input: MissionDispatchInput) => Promise<void> | void
 }) {
   const [form, setForm] = useState<MissionDispatchInput>({
@@ -66,7 +74,8 @@ export default function MissionDispatchPanel({
   )
 
   const priority = priorityMeta(form.priority)
-  const canSubmit = form.title.trim() !== '' && form.brief.trim() !== '' && form.successCriteria.trim() !== '' && form.ownerRoleId !== '' && !busy && !disabledReason
+  const requiresActivation = !!disabledReason
+  const canSubmit = form.title.trim() !== '' && form.brief.trim() !== '' && form.successCriteria.trim() !== '' && form.ownerRoleId !== '' && !busy && !requiresActivation
 
   const applyQuickStart = (quickStart: ExperienceQuickStart) => {
     setForm({
@@ -137,7 +146,22 @@ export default function MissionDispatchPanel({
 
       {disabledReason && (
         <div className="rounded-2xl border border-accent-yellow/30 bg-pastel-yellow/20 px-4 py-3 text-xs text-accent-yellow">
-          {disabledReason}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p>{disabledReason}</p>
+              <p className="text-[11px] text-accent-yellow/80">{activationHint}</p>
+            </div>
+            {onActivate && (
+              <button
+                type="button"
+                onClick={() => void onActivate()}
+                disabled={busy || activationBusy}
+                className="btn-primary text-xs whitespace-nowrap disabled:opacity-60"
+              >
+                {activationBusy ? '激活中...' : activationLabel}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -152,7 +176,7 @@ export default function MissionDispatchPanel({
                 onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
                 placeholder="例如：48 小时内推出新产品上线战役"
                 className="w-full rounded-xl border border-surface-border bg-white px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-300"
-                disabled={busy || !!disabledReason}
+                disabled={busy}
               />
             </label>
             <label className="space-y-1.5 text-xs text-text-secondary">
@@ -163,7 +187,7 @@ export default function MissionDispatchPanel({
                 onChange={(event) => setForm((current) => ({ ...current, successCriteria: event.target.value }))}
                 placeholder="例如：今天产出方案，明天上线 MVP，后天复盘"
                 className="w-full rounded-xl border border-surface-border bg-white px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-300"
-                disabled={busy || !!disabledReason}
+                disabled={busy}
               />
             </label>
           </div>
@@ -175,7 +199,7 @@ export default function MissionDispatchPanel({
               onChange={(event) => setForm((current) => ({ ...current, brief: event.target.value }))}
               placeholder="描述业务背景、期望动作、关键约束和交付时点。"
               className={`w-full rounded-2xl border border-surface-border bg-white px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-300 ${compact ? 'min-h-[110px]' : 'min-h-[140px]'}`}
-              disabled={busy || !!disabledReason}
+              disabled={busy}
             />
           </label>
 
@@ -186,13 +210,17 @@ export default function MissionDispatchPanel({
                 value={form.ownerRoleId}
                 onChange={(event) => setForm((current) => ({ ...current, ownerRoleId: event.target.value }))}
                 className="w-full rounded-xl border border-surface-border bg-white px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-300"
-                disabled={busy || !!disabledReason}
+                disabled={busy || roles.length === 0}
               >
-                {roles.map((role) => (
-                  <option key={role.manifest.id} value={role.manifest.id}>
-                    {role.manifest.name} · {role.manifest.layer}
-                  </option>
-                ))}
+                {roles.length > 0 ? (
+                  roles.map((role) => (
+                    <option key={role.manifest.id} value={role.manifest.id}>
+                      {role.manifest.name} · {role.manifest.layer}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">激活团队后可选择负责人</option>
+                )}
               </select>
             </label>
             <label className="space-y-1.5 text-xs text-text-secondary">
@@ -201,7 +229,7 @@ export default function MissionDispatchPanel({
                 value={form.priority}
                 onChange={(event) => setForm((current) => ({ ...current, priority: event.target.value as MissionPriority }))}
                 className="w-full rounded-xl border border-surface-border bg-white px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-300"
-                disabled={busy || !!disabledReason}
+                disabled={busy}
               >
                 <option value="normal">标准推进</option>
                 <option value="high">高优先级</option>
@@ -217,7 +245,7 @@ export default function MissionDispatchPanel({
               <span className="badge badge-cyan">统一入口 Web</span>
             </div>
             <button type="button" onClick={() => void handleDispatch()} className="btn-primary text-xs" disabled={!canSubmit}>
-              {busy ? '正在下达...' : '🚀 下达 Mission'}
+              {busy ? '正在下达...' : requiresActivation ? '先激活团队' : '🚀 下达 Mission'}
             </button>
           </div>
         </div>

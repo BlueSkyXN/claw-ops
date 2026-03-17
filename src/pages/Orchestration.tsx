@@ -860,6 +860,17 @@ export default function Orchestration() {
     }
   }, [loadRuntime])
 
+  const selectedPresetSummary = useMemo(
+    () => presets.find((preset) => preset.id === selectedTemplateId) ?? null,
+    [presets, selectedTemplateId],
+  )
+
+  const handleMissionActivation = useCallback(async () => {
+    const templateId = selectedTemplateId ?? presets[0]?.id ?? null
+    if (!templateId) return
+    await handleImport(templateId)
+  }, [handleImport, presets, selectedTemplateId])
+
   const loadedExperience = runtime?.selectedExperience ?? null
   const activePreset = runtime?.activeExperiencePreset ?? null
   const selectedTask = useMemo(
@@ -1199,7 +1210,11 @@ export default function Orchestration() {
               roles={activePreset?.roles ?? []}
               quickStarts={activePreset?.summary.quickStarts ?? []}
               busy={missionBusy}
+              activationBusy={importingId === (selectedTemplateId ?? presets[0]?.id ?? null)}
               disabledReason={activePreset ? null : '当前没有运行中的企业编排团队，无法投递 Mission。'}
+              activationLabel={selectedPresetSummary ? `🚀 导入 ${selectedPresetSummary.name}` : '🚀 导入团队'}
+              activationHint="你可以先填写 Mission 草稿；导入当前选中的团队模板后，将自动保留内容并补齐负责人。"
+              onActivate={() => handleMissionActivation()}
               onDispatch={handleMissionDispatch}
             />
             <ActiveTasksPanel

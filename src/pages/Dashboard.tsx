@@ -98,7 +98,7 @@ export default function Dashboard() {
     void loadData(true)
   }), [loadData])
 
-  const handleQuickImport = useCallback(async () => {
+  const handleQuickImport = useCallback(async (navigateToOrchestration = true) => {
     let shouldReset = true
     setImportingPreset(true)
     try {
@@ -106,7 +106,9 @@ export default function Dashboard() {
       await loadData()
       shouldReset = false
       setImportingPreset(false)
-      navigate('/orchestration')
+      if (navigateToOrchestration) {
+        navigate('/orchestration')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '导入 OPC 模板失败')
     } finally {
@@ -252,7 +254,7 @@ export default function Dashboard() {
           description="一键拉起策略、产品、研发、内容、运维与复盘角色，并同步生成真实可观测的任务、审批与编排控制面。"
           busy={importingPreset}
           onPreview={() => navigate('/orchestration')}
-          onImport={handleQuickImport}
+          onImport={() => void handleQuickImport(true)}
         />
       )}
 
@@ -260,7 +262,11 @@ export default function Dashboard() {
         roles={runtime?.activeExperiencePreset?.roles ?? []}
         quickStarts={runtime?.activeExperiencePreset?.summary.quickStarts ?? []}
         busy={missionBusy}
+        activationBusy={importingPreset}
         disabledReason={runtime?.activeExperiencePreset ? null : '先导入并激活企业编排团队，才能把 Mission 投递给组织负责人。'}
+        activationLabel="🚀 激活 OPC 团队"
+        activationHint="你可以先写标题、简报和成功标准；激活后会自动保留草稿并补齐负责人。"
+        onActivate={() => handleQuickImport(false)}
         onDispatch={handleMissionDispatch}
       />
 
