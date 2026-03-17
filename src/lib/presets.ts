@@ -195,8 +195,10 @@ export async function loadTeamTemplate(templateId: string): Promise<PresetTeamTe
 
 /**
  * 部署单个预设角色到 OpenClaw Gateway
- * 流程: agents.create → agents.update(emoji) → agents.files.set(SOUL.md) →
+ * 流程: agents.create → agents.update → agents.files.set(SOUL.md) →
  *       agents.files.set(claw-ops.rolepack.json) → skills.install
+ *
+ * 若同名智能体已存在，跳过创建步骤、直接覆盖更新（幂等）。
  */
 export async function deployRole(
   roleId: string,
@@ -216,15 +218,28 @@ export async function deployRole(
     onProgress?.({ step: s, current: step, total: totalSteps, label })
   }
 
-  // 1. 创建智能体
+  // 1. 创建智能体（若已存在则复用）
+  let agentId: string
+  let isNew = false
   progress('create', `创建智能体 ${manifest.name}（${manifest.id}）...`)
-  const { agentId } = await api.createAgent({
-    name: manifest.id,
-    workspace: `~/.openclaw/workspaces/${capabilities.oneClickDefaults.workspaceSuffix}`,
-    emoji: manifest.emoji,
-  })
+  try {
+    const result = await api.createAgent({
+      name: manifest.id,
+      workspace: `~/.openclaw/workspaces/${capabilities.oneClickDefaults.workspaceSuffix}`,
+      emoji: manifest.emoji,
+    })
+    agentId = result.agentId
+    isNew = true
+  } catch (err) {
+    if (isAgentAlreadyExistsError(err)) {
+      // 同名智能体已存在，复用其 ID 并继续覆盖更新
+      agentId = manifest.id
+    } else {
+      throw err
+    }
+  }
 
-  // 后续步骤如果失败，回滚删除已创建的智能体
+  // 后续步骤如果失败且是新建的智能体，回滚删除
   try {
     // 2. 更新名称元数据
     progress('update', '设置显示名称...')
@@ -252,13 +267,21 @@ export async function deployRole(
       }
     }
   } catch (err) {
-    // 部署中途失败，回滚: 删除已创建的智能体
-    try { await api.deleteAgent({ agentId }) } catch { /* 回滚失败不抛出 */ }
+    // 仅回滚本次新建的智能体，已存在的不删除
+    if (isNew) {
+      try { await api.deleteAgent({ agentId }) } catch { /* 回滚失败不抛出 */ }
+    }
     throw err
   }
 
   progress('done', '部署完成！')
   return agentId
+}
+
+/** 判断是否为 "agent already exists" 错误 */
+function isAgentAlreadyExistsError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return /already exists/i.test(msg)
 }
 
 /**

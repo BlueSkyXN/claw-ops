@@ -137,17 +137,6 @@ function workspaceSuffix(workspace?: string): string | null {
   return last ? slugify(last) : null
 }
 
-function uniqueAgentId(candidate: string, agents: AgentSummary[]): string {
-  const normalized = candidate || `agent-${agents.length + 1}`
-  if (!agents.some((agent) => agent.id === normalized)) return normalized
-
-  let seq = 2
-  while (agents.some((agent) => agent.id === `${normalized}-${seq}`)) {
-    seq += 1
-  }
-  return `${normalized}-${seq}`
-}
-
 function findTrailingAgentId(sessionKey: string, agents: AgentSummary[]): string | null {
   const sortedIds = [...agents.map((agent) => agent.id)].sort((left, right) => right.length - left.length)
   return sortedIds.find((agentId) => sessionKey.endsWith(`-${agentId}`)) ?? null
@@ -742,7 +731,11 @@ export function createMockAgent(params: AgentsCreateParams): { agentId: string }
 
   commitWorkspace((workspace) => {
     const preferredId = workspaceSuffix(params.workspace) ?? slugify(params.name)
-    agentId = uniqueAgentId(preferredId, workspace.agents)
+    // 与真实网关一致：同名 agent 已存在时抛出错误
+    if (workspace.agents.some((agent) => agent.id === preferredId)) {
+      throw new Error(`agent "${preferredId}" already exists`)
+    }
+    agentId = preferredId
     workspace.agents.push({
       id: agentId,
       name: params.name,
