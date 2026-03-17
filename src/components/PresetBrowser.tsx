@@ -222,10 +222,8 @@ function RoleDetailPanel({
           <section>
             <h4 className="text-xs font-semibold text-text-secondary mb-2">📂 部署文件</h4>
             <div className="text-[11px] text-text-muted space-y-0.5">
-              <p>• SOUL.md — 人设提示词</p>
-              <p>• workflow.json — 工作流阶段定义</p>
-              <p>• authority.json — 权限矩阵</p>
-              <p>• capabilities.json — 能力与沙箱配置</p>
+              <p>• SOUL.md — 编译后的人设与原生自编排约束</p>
+              <p>• claw-ops.rolepack.json — claw-ops 控制面元数据（authority / workflow / capabilities 汇总）</p>
             </div>
           </section>
         </div>

@@ -24,6 +24,7 @@ import type {
   Snapshot,
 } from '../types/openclaw'
 import { buildUsageCostSummary, getSessionUsageTotals } from '../lib/usage'
+import { getOrchestrationSessionMetadata } from '../lib/orchestration-metadata'
 import {
   mockAgents,
   mockChannelsStatus,
@@ -116,6 +117,12 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
+function toMetadataRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined
+}
+
 function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -147,6 +154,9 @@ function findTrailingAgentId(sessionKey: string, agents: AgentSummary[]): string
 }
 
 function detectSessionAgent(session: GatewaySessionRow, agents: AgentSummary[]): AgentSummary | undefined {
+  if (session.agentId) {
+    return agents.find((agent) => agent.id === session.agentId)
+  }
   const trailingAgentId = findTrailingAgentId(session.key, agents)
   if (trailingAgentId) {
     return agents.find((agent) => agent.id === trailingAgentId)
@@ -644,15 +654,21 @@ export function sendMockChatMessage(params: ChatSendParams): ChatMessage[] {
   let messages: ChatMessage[] = []
 
   commitWorkspace((workspace) => {
-    const targetAgentId = params.agentId
-      ?? findTrailingAgentId(params.sessionKey, workspace.agents)
-      ?? workspace.agents[0]?.id
-      ?? 'default'
+    const incomingMetadata = toMetadataRecord(params.metadata)
+    const orchestrationMetadata = getOrchestrationSessionMetadata(incomingMetadata)
     const existingIndex = workspace.sessionsList.sessions.findIndex((session) => session.key === params.sessionKey)
     const existingSession = existingIndex >= 0 ? workspace.sessionsList.sessions[existingIndex] : null
+    const inferredAgentId = params.agentId
+      ?? findTrailingAgentId(params.sessionKey, workspace.agents)
+      ?? null
+    const targetAgentId = inferredAgentId
+      ?? existingSession?.agentId
+      ?? workspace.agents[0]?.id
+      ?? 'default'
     const nextSession: GatewaySessionRow = existingSession
       ? {
           ...existingSession,
+          agentId: params.agentId ?? inferredAgentId ?? existingSession.agentId,
           updatedAt: now,
           sendPolicy: 'allow',
           channel: params.channel ?? existingSession.channel ?? 'api',
@@ -661,10 +677,12 @@ export function sendMockChatMessage(params: ChatSendParams): ChatMessage[] {
           totalTokens: (existingSession.totalTokens ?? 0) + tokenDelta,
           inputTokens: (existingSession.inputTokens ?? 0) + Math.round(tokenDelta * 0.45),
           outputTokens: (existingSession.outputTokens ?? 0) + Math.round(tokenDelta * 0.55),
+          metadata: incomingMetadata ? { ...(toMetadataRecord(existingSession.metadata) ?? {}), ...incomingMetadata } : existingSession.metadata,
         }
       : {
           key: params.sessionKey,
           kind: 'direct',
+          agentId: targetAgentId,
           label: typeof params.metadata?.taskTitle === 'string'
             ? params.metadata.taskTitle
             : `控制操作 · ${targetAgentId}`,
@@ -684,6 +702,8 @@ export function sendMockChatMessage(params: ChatSendParams): ChatMessage[] {
           sendPolicy: 'allow',
           responseUsage: 'tokens',
           contextTokens: 200000,
+          spawnedBy: orchestrationMetadata?.orchestrationParentSessionKey,
+          metadata: incomingMetadata,
         }
 
     if (existingIndex >= 0) {

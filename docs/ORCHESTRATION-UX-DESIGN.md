@@ -69,7 +69,7 @@
 | **渐进披露** | 先展示价值，再展示复杂度 | Dashboard 快捷入口 → Agents 团队预览 → 编排画布详情 |
 | **语义可视化** | 图形承载业务含义，而非纯技术拓扑 | 四层泳道、角色层级徽章、工作流边类型 |
 | **品牌一致** | 完全复用现有马卡龙色系 | 使用 LAYER_STYLES 已有 4 色映射到 L0-L3 |
-| **数据驱动** | 界面元素与后端数据直接绑定 | 从 workflow.json/authority.json 生成边，from agentFilesGet |
+| **数据驱动** | 界面元素与后端数据直接绑定 | 从预设详情或 `claw-ops.rolepack.json` 生成边，from agentFilesGet |
 | **空状态即入口** | 空画布是导入的最佳机会 | 0 智能体时显示 OPC 团队 CTA，覆盖全屏 |
 
 ---
@@ -193,7 +193,7 @@
 ### OrchestratorHealthStrip 规格
 
 **显示条件**: 始终显示（`agents.length > 0` 时）
-**数据来源**: 从已加载的 `agents[]` 列表中，通过 `agentFilesGet(id, 'workflow.json')` 按需获取层级信息（并缓存）
+**数据来源**: 从已加载的预设详情 / rolepack 数据中读取层级信息；运行期如需读取 agent 文件，优先从 `claw-ops.rolepack.json` 获取，而不是依赖部署态的 `workflow.json`
 
 **视觉结构**:
 ```
@@ -217,7 +217,7 @@
 
 **层级缺失状态**: 改用 `bg-surface-hover border-dashed border-surface-border text-text-muted`，内容文字"⚠ 缺失"加"从预设补全"链接
 
-**性能优化**: 层级信息从 `workflow.json` 的 `tier` 字段读取，仅第一次进入页面时批量拉取并缓存到组件 state；mock 模式直接从 mock 数据补全
+**性能优化**: 层级信息从预设详情或 `claw-ops.rolepack.json` 的 workflow 摘要读取，仅第一次进入页面时批量拉取并缓存到组件 state；mock 模式直接从 mock 数据补全
 
 ---
 
@@ -267,7 +267,7 @@ emoji + name + agentId + delete button + theme badge
 │  quality-director               │  ← agentId mono
 ├────────────────────────────────┤
 │  ⚡ 推理模型  💔 高成本          │  ← modelTier + costTier badges (pastel)
-│  阶段: planning, review         │  ← ownedStages from workflow.json (截断)
+│  阶段: planning, review         │  ← ownedStages from rolepack.workflow (截断)
 │  协作: 5 个智能体  上报: L1     │  ← allowAgents.length + escalateTo
 ├────────────────────────────────┤
 │  [编辑配置]  [查看工作流]        │  ← actions row
@@ -276,8 +276,8 @@ emoji + name + agentId + delete button + theme badge
 
 **实现说明**:
 - `[L0]` 徽章: `AgentLayerBadge` 组件，颜色由 LAYER_STYLES 映射
-- modelTier / costTier: 从 `capabilities.json` 读取（agentFilesGet 缓存）
-- ownedStages / allowAgents: 从 `workflow.json` / `authority.json` 读取（同一缓存批次）
+- modelTier / costTier: 从预设详情或 `claw-ops.rolepack.json` 读取（agentFilesGet 缓存）
+- ownedStages / allowAgents: 从 rolepack 内的 workflow / authority 摘要读取（同一缓存批次）
 - mock 模式: 在 `mock.ts` 中补充对应字段
 - **性能**: 文件读取按需懒加载（卡片展开/hover 时触发），并缓存到 React context
 
@@ -370,9 +370,9 @@ emoji + name + agentId + delete button + theme badge
 
 | 边类型 | 数据来源 | 样式 | 含义 |
 |--------|----------|------|------|
-| `handoff` | `workflow.json → handoffTo` | 实线 `#6366f1`（brand-500），箭头 | 工作流正向传递 |
-| `accept` | `workflow.json → acceptsFrom` | 虚线 `#3b82f6`（accent-blue），无箭头 | 接受来源标注 |
-| `escalate` | `authority.json → escalateTo` | 虚线 `#f59e0b`（accent-yellow），箭头 | 升级上报 |
+| `handoff` | `rolepack.workflow → handoffTo` | 实线 `#6366f1`（brand-500），箭头 | 工作流正向传递 |
+| `accept` | `rolepack.workflow → acceptsFrom` | 虚线 `#3b82f6`（accent-blue），无箭头 | 接受来源标注 |
+| `escalate` | `rolepack.authority → escalateTo` | 虚线 `#f59e0b`（accent-yellow），箭头 | 升级上报 |
 
 边标签（条件文字）从 `teamTemplate.workflow[].condition` 读取：
 ```tsx
@@ -554,14 +554,14 @@ function SwimlaneBackground({ lanes }: { lanes: LaneInfo[] }) {
 
 | 业务概念 | 数据来源 | UI 呈现 |
 |----------|----------|---------|
-| 智能体层级 | `workflow.json → tier` | LayerBadge (L0-L3 + 颜色) |
-| 工作流阶段 | `workflow.json → ownedStages[]` | 节点内 tag 列表 |
-| 工作流传递 | `workflow.json → handoffTo[]` | 实线靛蓝有向边 |
-| 升级上报 | `authority.json → escalateTo[]` | 虚线琥珀有向边 |
-| 协作许可 | `authority.json → allowAgents[]` | 节点 tooltip + 详情面板 |
-| 模型能力 | `capabilities.json → modelTier` | ⚡/💪/🧠 图标徽章 |
-| 成本档位 | `capabilities.json → costTier` | 💚/💛/💔 图标徽章 |
-| 技能清单 | `capabilities.json → requiredSkills[]` | 详情面板技能 chip |
+| 智能体层级 | `rolepack.workflow → tier` | LayerBadge (L0-L3 + 颜色) |
+| 工作流阶段 | `rolepack.workflow → ownedStages[]` | 节点内 tag 列表 |
+| 工作流传递 | `rolepack.workflow → handoffTo[]` | 实线靛蓝有向边 |
+| 升级上报 | `rolepack.authority → escalateTo[]` | 虚线琥珀有向边 |
+| 协作许可 | `rolepack.authority → allowAgents[]` | 节点 tooltip + 详情面板 |
+| 模型能力 | `rolepack.capabilities → modelTier` | ⚡/💪/🧠 图标徽章 |
+| 成本档位 | `rolepack.capabilities → costTier` | 💚/💛/💔 图标徽章 |
+| 技能清单 | `rolepack.capabilities → requiredSkills[]` | 详情面板技能 chip |
 | 实时活跃度 | `sessions.list → agentId 过滤` | 节点 "● N 活跃" 计数 |
 | 渠道连接 | `channels.status` | 通道拓扑视图（现有）|
 

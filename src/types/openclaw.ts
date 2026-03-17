@@ -233,6 +233,7 @@ export type SessionKind = 'direct' | 'group' | 'global' | 'unknown'
 export interface GatewaySessionRow {
   key: string
   kind: SessionKind
+  agentId?: string
   label?: string
   displayName?: string
   derivedTitle?: string
@@ -262,6 +263,8 @@ export interface GatewaySessionRow {
   lastChannel?: string
   lastTo?: string
   lastAccountId?: string
+  spawnedBy?: string
+  metadata?: Record<string, unknown>
 }
 
 export interface SessionsListParams {

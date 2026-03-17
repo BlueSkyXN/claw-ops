@@ -4,8 +4,10 @@ import {
   loadManifest,
   loadRoleDetail,
   loadTeamTemplate,
+  ROLEPACK_FILE_NAME,
   type PresetRoleDetail,
 } from './presets'
+import { buildOrchestrationSessionMetadata } from './orchestration-metadata'
 import {
   applyMockWorkspaceSeed,
   deriveUsageFromSessions,
@@ -361,9 +363,7 @@ function buildAgents(roles: PresetRoleDetail[]): { agents: AgentSummary[]; agent
   const agentFiles = roles.reduce<Record<string, Record<string, string>>>((acc, role) => {
     acc[role.manifest.id] = {
       'SOUL.md': role.soulContent,
-      'workflow.json': JSON.stringify(role.workflow, null, 2),
-      'authority.json': JSON.stringify(role.authority, null, 2),
-      'capabilities.json': JSON.stringify(role.capabilities, null, 2),
+      [ROLEPACK_FILE_NAME]: role.rolepackContent,
     }
     return acc
   }, {})
@@ -433,6 +433,7 @@ type WorkflowStep = PresetTeamTemplate['workflow'][number]
 
 type GeneratedTaskScenarioStep = WorkflowStep & {
   sessionKey: string
+  parentSessionKey: string
   updatedAt: number
   totalTokens: number
   state: 'running' | 'waiting' | 'completed'
@@ -440,6 +441,7 @@ type GeneratedTaskScenarioStep = WorkflowStep & {
 
 interface GeneratedTaskScenario {
   id: string
+  taskId: string
   quickStart: ExperienceQuickStart
   owner: PresetRoleDetail
   rootSessionKey: string
@@ -483,6 +485,7 @@ function buildTaskScenarios(
   return summary.quickStarts.map((quickStart, index) => {
     const owner = findRole(quickStart.ownerRoleId, roles)
     const taskSlug = slug(quickStart.id)
+    const taskId = `task-${summary.id}-${taskSlug}`
     const workflowSteps = collectWorkflowSteps(template.workflow, owner.manifest.id)
     const profile = profiles[index % profiles.length]
     const startedAt = now - (index * 36 + 28) * 60_000
@@ -502,6 +505,9 @@ function buildTaskScenarios(
         return {
           ...step,
           sessionKey: `sess-api-${taskSlug}-${step.from}-${step.to}`,
+          parentSessionKey: stepIndex === 0
+            ? rootSessionKey
+            : `sess-api-${taskSlug}-${workflowSteps[stepIndex - 1].from}-${workflowSteps[stepIndex - 1].to}`,
           updatedAt: startedAt + (stepIndex + 1) * 6 * 60_000,
           totalTokens: 9000 + stepIndex * 2400 + index * 1700,
           state: profile === 'completed'
@@ -516,6 +522,7 @@ function buildTaskScenarios(
 
     return {
       id: quickStart.id,
+      taskId,
       quickStart,
       owner,
       rootSessionKey,
@@ -541,6 +548,7 @@ function buildSessions(
     sessions.push({
       key: scenario.rootSessionKey,
       kind: 'direct',
+      agentId: scenario.owner.manifest.id,
       label: scenario.quickStart.title,
       displayName: scenario.quickStart.user,
       channel: scenario.quickStart.channel,
@@ -555,6 +563,15 @@ function buildSessions(
       reasoningLevel: scenario.owner.manifest.modelTier,
       contextTokens: 200000,
       responseUsage: 'full',
+      metadata: buildOrchestrationSessionMetadata({
+        orchestrationTaskId: scenario.taskId,
+        orchestrationRootSessionKey: scenario.rootSessionKey,
+        orchestrationOwnerRoleId: scenario.owner.manifest.id,
+        orchestrationEntryNodeId: scenario.quickStart.id,
+        controlAction: 'experience-seed',
+        taskTitle: scenario.quickStart.title,
+        originUser: scenario.quickStart.user,
+      }),
     })
 
     scenario.steps.forEach((step) => {
@@ -564,6 +581,8 @@ function buildSessions(
       sessions.push({
         key: step.sessionKey,
         kind: 'direct',
+        agentId: step.to,
+        spawnedBy: step.parentSessionKey,
         label: `${scenario.quickStart.title} · ${fromRole.manifest.name} → ${toRole.manifest.name}`,
         displayName: fromRole.manifest.name,
         channel: 'api',
@@ -583,6 +602,18 @@ function buildSessions(
         reasoningLevel: toRole.manifest.modelTier,
         contextTokens: 200000,
         responseUsage: 'tokens',
+        metadata: buildOrchestrationSessionMetadata({
+          orchestrationTaskId: scenario.taskId,
+          orchestrationRootSessionKey: scenario.rootSessionKey,
+          orchestrationOwnerRoleId: scenario.owner.manifest.id,
+          orchestrationParentSessionKey: step.parentSessionKey,
+          orchestrationFromRoleId: step.from,
+          orchestrationToRoleId: step.to,
+          orchestrationEntryNodeId: scenario.quickStart.id,
+          controlAction: 'experience-seed',
+          taskTitle: scenario.quickStart.title,
+          originUser: scenario.quickStart.user,
+        }),
       })
     })
   })

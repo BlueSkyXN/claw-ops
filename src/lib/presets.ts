@@ -22,11 +22,12 @@ export interface PresetRoleDetail {
   authority: PresetRoleAuthority
   workflow: PresetRoleWorkflow
   soulContent: string
+  rolepackContent: string
 }
 
 /** 部署进度回调参数 */
 export interface DeployProgress {
-  step: 'create' | 'update' | 'soul' | 'workflow' | 'authority' | 'capabilities' | 'skills' | 'done'
+  step: 'create' | 'update' | 'soul' | 'rolepack' | 'skills' | 'done'
   current: number
   total: number
   label: string
@@ -37,6 +38,7 @@ export interface DeployProgress {
 // ==========================================
 
 const PRESET_BASE = '/presets/enterprise-command-center'
+export const ROLEPACK_FILE_NAME = 'claw-ops.rolepack.json'
 
 // ==========================================
 // 清单缓存 (使用 Promise 消除并发请求的竞态条件)
@@ -72,6 +74,85 @@ function ensureOk(resp: Response, label: string): Response {
   return resp
 }
 
+function formatInlineList(items: string[]): string {
+  return items.length > 0 ? items.map((item) => `\`${item}\``).join('、') : '无'
+}
+
+function buildCompiledSoulContent(
+  manifest: PresetRoleManifest,
+  capabilities: PresetRoleCapabilities,
+  authority: PresetRoleAuthority,
+  workflow: PresetRoleWorkflow,
+  sourceSoul: string,
+): string {
+  const orchestrationRules = [
+    '## OpenClaw 原生编排约束',
+    '',
+    '### 角色运行边界',
+    `- 角色 ID：\`${manifest.id}\``,
+    `- 当前层级：${manifest.layer} / ${manifest.layerName}`,
+    `- 可调度下游：${formatInlineList(authority.allowAgents)}`,
+    `- 升级路径：${formatInlineList(authority.escalateTo)}`,
+    `- 必须通知：${formatInlineList(authority.mustNotify)}`,
+    `- 最大并发子任务：${authority.maxConcurrent || manifest.defaultMaxConcurrent}`,
+    `- 工具画像：${formatInlineList(capabilities.toolingProfile)}`,
+    `- 沙箱策略：\`${capabilities.sandbox.mode}\`${capabilities.sandbox.scope ? ` / ${capabilities.sandbox.scope}` : ''}`,
+    '',
+    '### 阶段职责',
+    `- 负责阶段：${formatInlineList(workflow.ownedStages)}`,
+    `- 可接受来源：${formatInlineList(workflow.acceptsFrom)}`,
+    `- 典型交接目标：${formatInlineList(workflow.handoffTo)}`,
+    `- 必须检查：${formatInlineList(workflow.mandatoryChecks)}`,
+    `- 必需产物：${formatInlineList(workflow.requiredArtifacts)}`,
+    '',
+    '### 自编排执行规则',
+    '- 接收到入口任务后，先判断是否属于你当前负责阶段，再决定继续推进、交接还是升级。',
+    authority.allowAgents.length > 0
+      ? `- 需要下发子任务时，只能调度以下角色：${formatInlineList(authority.allowAgents)}。`
+      : '- 你没有下游调度权限，不得自行创造新的执行角色或私自扩散任务。',
+    '- 如需协作，优先使用 OpenClaw 原生的子会话 / spawn 能力推进下游，而不是通过普通闲聊伪造工作流。',
+    '- 每次交接都必须附带：任务目标、成功标准、当前结论、风险、所需产物、下一次同步时间。',
+    authority.escalateTo.length > 0
+      ? `- 发现超出边界、需要治理决策或无法继续推进时，按升级路径上报：${formatInlineList(authority.escalateTo)}。`
+      : '- 发现超出边界或无法继续推进时，必须明确说明阻塞原因与所需决策，不得静默等待。',
+    authority.mustNotify.length > 0
+      ? `- 以下角色必须同步知情：${formatInlineList(authority.mustNotify)}。`
+      : '- 完成当前阶段后，必须输出结构化摘要并明确下一步交接对象。',
+    manifest.layer === 'L0'
+      ? '- 你属于治理层，遇到高风险、不可逆或需要放行/驳回的动作时，必须先发起执行审批请求，再继续推进。'
+      : '- 遇到高风险、不可逆或跨边界动作时，先请求审批或升级，不得直接越权执行。',
+    '',
+    '### claw-ops 观察面要求',
+    '- 你的阶段性回报必须清晰标出：当前阶段、已完成事项、关键证据、风险与下一步动作。',
+    '- 若任务进入等待、阻塞或失败状态，必须给出可供控制面观察和干预的明确信号。',
+  ]
+
+  return `${sourceSoul.trim()}\n\n---\n\n${orchestrationRules.join('\n')}\n`
+}
+
+function buildRolepackContent(
+  manifest: PresetRoleManifest,
+  capabilities: PresetRoleCapabilities,
+  authority: PresetRoleAuthority,
+  workflow: PresetRoleWorkflow,
+): string {
+  return JSON.stringify({
+    schema: 'claw-ops/rolepack/v1',
+    manifest: {
+      id: manifest.id,
+      version: manifest.version,
+      name: manifest.name,
+      layer: manifest.layer,
+      layerName: manifest.layerName,
+      category: manifest.category,
+      organizationalUnit: manifest.organizationalUnit,
+    },
+    authority,
+    workflow,
+    capabilities,
+  }, null, 2)
+}
+
 /** 加载单个角色的完整数据 */
 export async function loadRoleDetail(roleId: string): Promise<PresetRoleDetail> {
   const manifest = await loadManifest()
@@ -93,7 +174,8 @@ export async function loadRoleDetail(roleId: string): Promise<PresetRoleDetail> 
     capabilities: capsJson,
     authority: authJson,
     workflow: wfJson,
-    soulContent: soulText,
+    soulContent: buildCompiledSoulContent(roleJson, capsJson, authJson, wfJson, soulText),
+    rolepackContent: buildRolepackContent(roleJson, capsJson, authJson, wfJson),
   }
 }
 
@@ -114,7 +196,7 @@ export async function loadTeamTemplate(templateId: string): Promise<PresetTeamTe
 /**
  * 部署单个预设角色到 OpenClaw Gateway
  * 流程: agents.create → agents.update(emoji) → agents.files.set(SOUL.md) →
- *       agents.files.set(workflow/authority/capabilities) → skills.install
+ *       agents.files.set(claw-ops.rolepack.json) → skills.install
  */
 export async function deployRole(
   roleId: string,
@@ -122,11 +204,11 @@ export async function deployRole(
 ): Promise<string> {
   const detail = await loadRoleDetail(roleId)
   const api = getAPI()
-  const { manifest, capabilities, authority, workflow, soulContent } = detail
+  const { manifest, capabilities, soulContent, rolepackContent } = detail
 
-  // 总步骤: create(1) + update(1) + files(4) + skills(N)
+  // 总步骤: create(1) + update(1) + files(2) + skills(N)
   const skillCount = capabilities.requiredSkills.length
-  const totalSteps = 2 + 4 + skillCount + 1
+  const totalSteps = 2 + 2 + skillCount + 1
   let step = 0
 
   const progress = (s: DeployProgress['step'], label: string) => {
@@ -135,35 +217,27 @@ export async function deployRole(
   }
 
   // 1. 创建智能体
-  progress('create', `创建智能体 ${manifest.name}...`)
+  progress('create', `创建智能体 ${manifest.name}（${manifest.id}）...`)
   const { agentId } = await api.createAgent({
-    name: manifest.name,
+    name: manifest.id,
     workspace: `~/.openclaw/workspaces/${capabilities.oneClickDefaults.workspaceSuffix}`,
   })
 
   // 后续步骤如果失败，回滚删除已创建的智能体
   try {
     // 2. 更新元数据 (emoji)
-    progress('update', '设置 emoji 与元数据...')
-    await api.updateAgent({ agentId, emoji: manifest.emoji })
+    progress('update', '设置名称、emoji 与元数据...')
+    await api.updateAgent({ agentId, name: manifest.name, emoji: manifest.emoji })
 
     // 3. 写入 SOUL.md
     progress('soul', '写入 SOUL.md 人设文件...')
     await api.agentFilesSet(agentId, 'SOUL.md', soulContent)
 
-    // 4. 写入 workflow.json
-    progress('workflow', '写入工作流配置...')
-    await api.agentFilesSet(agentId, 'workflow.json', JSON.stringify(workflow, null, 2))
+    // 4. 写入 claw-ops 控制面 rolepack
+    progress('rolepack', `写入 ${ROLEPACK_FILE_NAME} 控制面元数据...`)
+    await api.agentFilesSet(agentId, ROLEPACK_FILE_NAME, rolepackContent)
 
-    // 5. 写入 authority.json
-    progress('authority', '写入权限矩阵...')
-    await api.agentFilesSet(agentId, 'authority.json', JSON.stringify(authority, null, 2))
-
-    // 6. 写入 capabilities.json
-    progress('capabilities', '写入能力配置...')
-    await api.agentFilesSet(agentId, 'capabilities.json', JSON.stringify(capabilities, null, 2))
-
-    // 7. 安装技能
+    // 5. 安装技能
     for (const skillId of capabilities.requiredSkills) {
       progress('skills', `安装技能: ${skillId}...`)
       try {

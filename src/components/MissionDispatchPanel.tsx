@@ -111,7 +111,7 @@ export default function MissionDispatchPanel({
           <p className="text-xs text-text-secondary mt-1 leading-5">{subtitle}</p>
         </div>
         <div className="text-[11px] text-text-secondary rounded-2xl border border-surface-border bg-surface-bg px-3 py-2">
-          通过 `chat.send` 直接把目标投递给组织负责人，统一从控制面入口发起，保持纯前端架构。
+          控制面只负责投递入口 Mission；后续由角色按原生自编排约束继续推进，保持纯前端入口。
         </div>
       </div>
 
@@ -260,7 +260,7 @@ export default function MissionDispatchPanel({
           <div className="rounded-2xl border border-surface-border bg-surface-bg p-4 text-xs text-text-secondary">
             <p className="font-semibold text-text-primary mb-2">投递结果</p>
             <p className="leading-6">
-              Mission 会作为新的入口会话进入组织，由负责人接单，并通过现有任务推断、审批、健康分析与路径高亮自动进入控制面。
+              Mission 会作为新的入口会话进入组织，由负责人接单；后续协作优先走原生子会话/委派路径，并继续被控制面观察、审批和干预。
             </p>
           </div>
         </div>

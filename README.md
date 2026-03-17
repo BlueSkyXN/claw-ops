@@ -16,7 +16,7 @@ OpenClaw Gateway 的配套运维可视化前端（纯前端 SPA）。通过 WebS
 | 📡 **渠道** (Channels) | 渠道连接状态、账户列表、4 态状态灯（configured/linked/running/connected）、出入站活动时间 |
 | ⏰ **定时任务** (CronJobs) | Cron 任务 CRUD、调度类型（at/every/cron）、运行日志、手动触发 |
 | 📈 **用量分析** (Usage) | 对齐 OpenClaw `sessions.usage` + `usage.cost` 双接口、Token/费用趋势图、按模型/供应商/智能体/渠道聚合、Top 20 会话、真实数据渲染上限保护 |
-| 🧩 **编排** (Orchestration) | 企业级编排控制面：Mission 发令、任务追踪、路径高亮、活策略面板、审批门禁、暂停/催办/重派、通道拓扑、组织架构 |
+| 🧩 **编排** (Orchestration) | 企业级编排控制面：Mission 发令、任务追踪、路径高亮、活策略面板、审批门禁、暂停/催办/重派、通道拓扑、组织架构；控制面负责入口投递，后续优先由角色原生自编排推进 |
 | 📜 **日志** (Logs) | 实时日志流、级别/来源筛选、自动滚动、CSV 导出 |
 | ⚙️ **配置** (Setup) | 4 步配置向导：模式选择 → 网关地址与认证 → 连接测试 → 完成 |
 
@@ -114,6 +114,7 @@ npm run preview
 - **`src/data/mock.ts`** — Mock 基础数据
 - **`src/data/mock-workspace.ts`** — 持久化 mock 工作区（角色/文件/会话/技能/编排体验）
 - **`src/lib/orchestration.ts`** — 团队模板摘要、OPC 体验种子、一键导入编排服务
+- **预设导入约定** — 设计期资产保留 `workflow.json` / `authority.json` / `capabilities.json`，部署期则编译进最终 `SOUL.md`，并额外写入 `claw-ops.rolepack.json` 供控制面追踪
 - **`src/lib/task-tracker.ts`** — 前端任务推断引擎（由 sessions/logs/approvals 推导任务）
 - **`src/lib/flow-tracer.ts`** — 执行路径高亮与节点/边状态映射
 - **`src/lib/health-analyzer.ts`** — 编排健康分析（覆盖度、吞吐、延迟、瓶颈、成本）

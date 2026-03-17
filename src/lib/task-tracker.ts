@@ -9,6 +9,10 @@ import type {
 import type { PresetLayer, PresetTeamWorkflowStep } from '../types/presets'
 import type { LoadedExperiencePreset } from './orchestration'
 import { getSessionUsageTotals } from './usage'
+import {
+  getOrchestrationParentSessionKey,
+  getOrchestrationSessionMetadata,
+} from './orchestration-metadata'
 
 export type TaskStatus = 'active' | 'waiting' | 'completed' | 'stalled' | 'failed' | 'blocked'
 export type TaskStepStatus = 'pending' | 'running' | 'completed' | 'waiting' | 'blocked' | 'failed'
@@ -132,7 +136,15 @@ function median(values: number[]): number {
   return sorted.length % 2 === 0 ? Math.round((sorted[mid - 1] + sorted[mid]) / 2) : sorted[mid]
 }
 
-function parseSessionKey(sessionKey: string, roleIds: string[]): ParsedSessionKey {
+function dedupeSessionsByKey(items: GatewaySessionRow[]): GatewaySessionRow[] {
+  const seen = new Map<string, GatewaySessionRow>()
+  items.forEach((item) => {
+    if (!seen.has(item.key)) seen.set(item.key, item)
+  })
+  return Array.from(seen.values())
+}
+
+function parseLegacySessionKey(sessionKey: string, roleIds: string[]): ParsedSessionKey {
   const sortedRoleIds = [...roleIds].sort((left, right) => right.length - left.length)
 
   if (sessionKey.startsWith('sess-main')) {
@@ -182,6 +194,76 @@ function parseSessionKey(sessionKey: string, roleIds: string[]): ParsedSessionKe
   return { kind: 'unknown', channel: null, roleId: null, fromRoleId: null, toRoleId: null, taskHint: null }
 }
 
+function parseSession(session: GatewaySessionRow, roleIds: string[]): ParsedSessionKey {
+  const metadata = getOrchestrationSessionMetadata(session)
+  const channel = session.channel ?? session.lastChannel ?? null
+  const legacyParsed = parseLegacySessionKey(session.key, roleIds)
+
+  if (metadata?.orchestrationFromRoleId && metadata.orchestrationToRoleId) {
+    return {
+      kind: 'handoff',
+      channel,
+      roleId: metadata.orchestrationToRoleId,
+      fromRoleId: metadata.orchestrationFromRoleId,
+      toRoleId: metadata.orchestrationToRoleId,
+      taskHint: metadata.orchestrationTaskId,
+    }
+  }
+
+  if (metadata?.orchestrationOwnerRoleId && metadata.orchestrationRootSessionKey === session.key) {
+    return {
+      kind: 'entry',
+      channel,
+      roleId: metadata.orchestrationOwnerRoleId,
+      fromRoleId: null,
+      toRoleId: null,
+      taskHint: metadata.orchestrationTaskId,
+    }
+  }
+
+  if (legacyParsed.kind !== 'unknown') {
+    return legacyParsed
+  }
+
+  if (session.agentId && roleIds.includes(session.agentId) && !session.spawnedBy) {
+    return {
+      kind: 'entry',
+      channel,
+      roleId: session.agentId,
+      fromRoleId: null,
+      toRoleId: null,
+      taskHint: metadata?.orchestrationTaskId ?? null,
+    }
+  }
+
+  return legacyParsed
+}
+
+function collectExplicitlyLinkedSessions(
+  rootSession: GatewaySessionRow,
+  sessions: GatewaySessionRow[],
+  taskId: string,
+): GatewaySessionRow[] {
+  const linked = new Map<string, GatewaySessionRow>([[rootSession.key, rootSession]])
+  let changed = true
+
+  while (changed) {
+    changed = false
+    sessions.forEach((session) => {
+      if (linked.has(session.key)) return
+      const metadata = getOrchestrationSessionMetadata(session)
+      const parentSessionKey = getOrchestrationParentSessionKey(session)
+      const sameTask = metadata?.orchestrationTaskId === taskId || metadata?.orchestrationRootSessionKey === rootSession.key
+      if (!sameTask && (!parentSessionKey || !linked.has(parentSessionKey))) return
+      linked.set(session.key, session)
+      changed = true
+    })
+  }
+
+  linked.delete(rootSession.key)
+  return Array.from(linked.values())
+}
+
 function buildWorkflowByFrom(workflow: PresetTeamWorkflowStep[]): Map<string, PresetTeamWorkflowStep[]> {
   const result = new Map<string, PresetTeamWorkflowStep[]>()
   workflow.forEach((step) => {
@@ -222,9 +304,12 @@ function matchQuickStart(
 }
 
 function buildTaskHintCandidates(session: GatewaySessionRow, matchedQuickStartId: string | null): Set<string> {
+  const metadata = getOrchestrationSessionMetadata(session)
   const candidates = new Set<string>()
   const values = [
     matchedQuickStartId,
+    metadata?.orchestrationTaskId,
+    metadata?.taskTitle,
     session.label,
     session.derivedTitle,
     session.displayName,
@@ -247,7 +332,7 @@ function buildRealizedWorkflowSessions(
   if (!ownerRoleId) return []
 
   const candidates = sessions
-    .map((session) => ({ session, parsed: parseSessionKey(session.key, roleIds) }))
+    .map((session) => ({ session, parsed: parseSession(session, roleIds) }))
     .filter(({ parsed }) => parsed.kind === 'handoff' && parsed.fromRoleId != null && parsed.toRoleId != null)
     .map(({ session, parsed }) => {
       const workflowStep = (workflowByFrom.get(parsed.fromRoleId!) ?? []).find((step) => step.to === parsed.toRoleId)
@@ -410,15 +495,22 @@ export function buildTrackedTasks({
   const workflowByFrom = buildWorkflowByFrom(workflow)
   const parsedSessions = sessions
     .filter((session) => session.kind !== 'global')
-    .map((session) => ({ session, parsed: parseSessionKey(session.key, roleIds) }))
-  const rootSessions = parsedSessions.filter(({ parsed }) => parsed.kind !== 'handoff')
+    .map((session) => ({ session, parsed: parseSession(session, roleIds) }))
+  const rootSessions = parsedSessions.filter(({ session, parsed }) => {
+    const metadata = getOrchestrationSessionMetadata(session)
+    if (session.spawnedBy) return false
+    if (metadata?.orchestrationRootSessionKey && metadata.orchestrationRootSessionKey !== session.key) return false
+    return parsed.kind !== 'handoff' || metadata?.orchestrationRootSessionKey === session.key
+  })
   const quickStarts = loadedExperience?.summary.quickStarts ?? []
 
   const tasks = rootSessions.map(({ session: rootSession, parsed }) => {
-    const ownerRoleId = parsed.roleId
+    const rootMetadata = getOrchestrationSessionMetadata(rootSession)
+    const ownerRoleId = rootMetadata?.orchestrationOwnerRoleId ?? parsed.roleId
     const matchedQuickStart = matchQuickStart(rootSession, quickStarts, ownerRoleId)
-    const taskId = rootSession.key
+    const taskId = rootMetadata?.orchestrationTaskId ?? rootSession.key
     const hintCandidates = buildTaskHintCandidates(rootSession, matchedQuickStart?.id ?? null)
+    const explicitLinkedSessions = collectExplicitlyLinkedSessions(rootSession, sessions, taskId)
     const relatedHandoffSessions = parsedSessions
       .filter(({ parsed: candidate }) => candidate.kind === 'handoff')
       .filter(({ session, parsed: candidate }) => {
@@ -431,7 +523,7 @@ export function buildTrackedTasks({
       })
       .map(({ session }) => session)
 
-    const relatedSessions = [rootSession, ...relatedHandoffSessions]
+    const relatedSessions = dedupeSessionsByKey([rootSession, ...explicitLinkedSessions, ...relatedHandoffSessions])
       .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
     const relatedSessionKeys = dedupe(relatedSessions.map((session) => session.key))
     const relevantApprovals = approvals
@@ -592,14 +684,14 @@ export function buildTrackedTasks({
 
     return {
       id: taskId,
-      title: rootSession.label ?? rootSession.derivedTitle ?? matchedQuickStart?.title ?? rootSession.key,
+      title: rootSession.label ?? rootMetadata?.taskTitle ?? rootSession.derivedTitle ?? matchedQuickStart?.title ?? rootSession.key,
       summary: latestEvent ?? currentSessionForTask?.lastMessagePreview ?? matchedQuickStart?.outcome ?? '正在进行跨角色协同。',
       status,
       startedAt,
       updatedAt,
       durationMs: Math.max(1, updatedAt - startedAt),
       originChannel: rootSession.channel ?? rootSession.lastChannel ?? matchedQuickStart?.channel ?? 'api',
-      originUser: rootSession.displayName ?? matchedQuickStart?.user ?? 'Operator',
+      originUser: rootSession.displayName ?? rootMetadata?.originUser ?? matchedQuickStart?.user ?? 'Operator',
       rootSessionKey: rootSession.key,
       currentSessionKey: currentSessionForTask?.key ?? null,
       currentAgentId: currentRoleId,
@@ -608,7 +700,7 @@ export function buildTrackedTasks({
       currentSendPolicy: currentSessionForTask?.sendPolicy ?? null,
       ownerRoleId,
       ownerRoleName: ownerRoleId ? resolveRoleName(ownerRoleId, roleNameById, agentNameById) : null,
-      entryNodeId: matchedQuickStart?.id ?? null,
+      entryNodeId: rootMetadata?.orchestrationEntryNodeId ?? matchedQuickStart?.id ?? null,
       steps,
       pendingApprovals: relevantApprovals,
       relatedSessionKeys,

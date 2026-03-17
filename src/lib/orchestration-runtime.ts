@@ -16,6 +16,7 @@ import {
   type TaskTrackerSummary,
   type TrackedTask,
 } from './task-tracker'
+import { buildOrchestrationSessionMetadata } from './orchestration-metadata'
 
 export interface OrchestrationRuntime {
   agents: Awaited<ReturnType<ReturnType<typeof getAPI>['getAgents']>>
@@ -181,48 +182,58 @@ function buildMissionDispatchMessage(input: MissionDispatchInput): string {
     `目标：${input.brief}`,
     `成功标准：${input.successCriteria}`,
     `优先级：${input.priority}`,
+    '你收到的是入口 Mission。控制面只负责投递入口，后续请优先使用 OpenClaw 原生的子会话 / 委派能力继续编排下游，而不是用普通闲聊模拟工作流。',
     '请立即接单，拆解执行路径，识别阻塞项，并持续同步阶段性进展、风险与下一步动作。',
   ].join('\n')
 }
 
-function buildMissionSessionKey(input: MissionDispatchInput): string {
-  return `sess-web-dispatch-${slug(input.title)}-${Date.now()}-${input.ownerRoleId}`
+function buildMissionSessionKey(taskId: string, ownerRoleId: string): string {
+  return `sess-web-dispatch-${taskId}-${ownerRoleId}`
 }
 
 function buildRerouteParams(task: TrackedTask, targetRoleId: string): ChatSendParams {
   const fromRoleId = task.currentAgentId ?? task.ownerRoleId ?? targetRoleId
+  const parentSessionKey = task.currentSessionKey ?? task.rootSessionKey
   return {
     sessionKey: `sess-api-${slug(task.id)}-${fromRoleId}-${targetRoleId}`,
     text: buildControlMessage(task, 'reroute', targetRoleId),
     agentId: targetRoleId,
     channel: 'api',
     to: targetRoleId,
-    metadata: {
+    metadata: buildOrchestrationSessionMetadata({
+      orchestrationTaskId: task.id,
+      orchestrationRootSessionKey: task.rootSessionKey,
+      orchestrationOwnerRoleId: task.ownerRoleId ?? undefined,
+      orchestrationParentSessionKey: parentSessionKey,
+      orchestrationFromRoleId: fromRoleId,
+      orchestrationToRoleId: targetRoleId,
+      orchestrationEntryNodeId: task.entryNodeId ?? undefined,
       controlAction: 'reroute',
-      taskId: task.id,
-      sourceSessionKey: task.currentSessionKey ?? task.rootSessionKey,
-      fromRoleId,
-      targetRoleId,
-    },
+      taskTitle: task.title,
+      originUser: task.originUser,
+    }),
   }
 }
 
 export async function dispatchMission(input: MissionDispatchInput): Promise<void> {
   const api = getAPI()
-  const sessionKey = buildMissionSessionKey(input)
+  const taskId = `mission-${slug(input.title)}-${Date.now()}`
+  const sessionKey = buildMissionSessionKey(taskId, input.ownerRoleId)
   await api.sendChatMessage({
     sessionKey,
     text: buildMissionDispatchMessage(input),
     agentId: input.ownerRoleId,
     channel: 'web',
-    metadata: {
+    metadata: buildOrchestrationSessionMetadata({
+      orchestrationTaskId: taskId,
+      orchestrationRootSessionKey: sessionKey,
+      orchestrationOwnerRoleId: input.ownerRoleId,
       controlAction: 'mission-dispatch',
       taskTitle: input.title,
       missionPriority: input.priority,
       successCriteria: input.successCriteria,
-      ownerRoleId: input.ownerRoleId,
       originUser: 'CEO',
-    },
+    }),
   })
 }
 
@@ -250,10 +261,16 @@ export async function performTaskIntervention(action: TaskInterventionAction): P
         sessionKey: action.task.currentSessionKey ?? action.task.rootSessionKey,
         text: buildControlMessage(action.task, 'nudge'),
         agentId: action.task.currentAgentId ?? action.task.ownerRoleId ?? undefined,
-        metadata: {
+        metadata: buildOrchestrationSessionMetadata({
+          orchestrationTaskId: action.task.id,
+          orchestrationRootSessionKey: action.task.rootSessionKey,
+          orchestrationOwnerRoleId: action.task.ownerRoleId ?? undefined,
+          orchestrationParentSessionKey: action.task.currentSessionKey ?? action.task.rootSessionKey,
+          orchestrationEntryNodeId: action.task.entryNodeId ?? undefined,
           controlAction: 'nudge',
-          taskId: action.task.id,
-        },
+          taskTitle: action.task.title,
+          originUser: 'CEO',
+        }),
       }
       await api.sendChatMessage(params)
       return
