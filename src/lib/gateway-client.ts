@@ -13,7 +13,7 @@ import type {
   Snapshot,
   PresenceEntry,
 } from '../types/openclaw'
-import { loadConfig, type OpenClawConfig } from './config'
+import { loadConfig, usesGatewayTransport, type OpenClawConfig } from './config'
 
 const PROTOCOL_VERSION = 3
 const DEFAULT_GATEWAY_CLIENT_ID: GatewayClientId = 'openclaw-control-ui'
@@ -452,7 +452,7 @@ export function createGatewayClient(options: GatewayClientOptions): GatewayClien
 }
 
 export function ensureGatewayClient(config: OpenClawConfig = loadConfig()): GatewayClient | null {
-  if (config.mode !== 'realtime' || config.useMockData) {
+  if (!usesGatewayTransport(config) || config.useMockData) {
     setGatewayClient(null)
     return null
   }

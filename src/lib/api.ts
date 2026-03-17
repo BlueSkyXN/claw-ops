@@ -1,8 +1,9 @@
 // API 层 — 统一数据获取接口
 // 根据配置自动切换 Mock 数据 / OpenClaw Gateway WebSocket JSON-RPC
 
-import { loadConfig } from './config'
+import { loadConfig, usesBridgeTransport, usesGatewayTransport } from './config'
 import { ensureGatewayClientReady } from './gateway-client'
+import { bridgeRpc, getBridgeHealth } from './bridge-client'
 import type {
   AgentSummary,
   AgentsListResult,
@@ -44,6 +45,7 @@ import {
   normalizeSessionsUsageResult,
   normalizeUsageCostSummary,
 } from './openclaw-normalizers'
+import { buildUsageCostSummary } from './usage'
 
 function getAPIErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message
@@ -64,6 +66,59 @@ export function isMissingScopeError(err: unknown, scopes?: string | string[]): b
   if (!scopes) return true
   const expected = Array.isArray(scopes) ? scopes : [scopes]
   return expected.some((scope) => new RegExp(`missing scope:\\s*${escapeRegExp(scope)}`, 'i').test(message))
+}
+
+function toUsageDateKey(ts: number | null | undefined, params?: Pick<SessionsUsageParams, 'mode' | 'utcOffset'>): string {
+  if (!ts) return ''
+
+  if (params?.mode === 'utc') {
+    return new Date(ts).toISOString().slice(0, 10)
+  }
+
+  if (params?.mode === 'specific' && params.utcOffset) {
+    const match = params.utcOffset.match(/^UTC([+-])(\d{1,2})(?::?(\d{2}))?$/i)
+    if (match) {
+      const sign = match[1] === '-' ? -1 : 1
+      const hours = Number.parseInt(match[2], 10)
+      const minutes = Number.parseInt(match[3] ?? '0', 10)
+      const offsetMinutes = sign * (hours * 60 + minutes)
+      return new Date(ts + offsetMinutes * 60_000).toISOString().slice(0, 10)
+    }
+  }
+
+  const localDate = new Date(ts)
+  const year = localDate.getFullYear()
+  const month = `${localDate.getMonth() + 1}`.padStart(2, '0')
+  const day = `${localDate.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function applyUsageWindow<T extends SessionsUsageParams | UsageCostParams | undefined>(params: T): T {
+  if (!params || !('days' in params) || typeof params.days !== 'number' || params.startDate || params.endDate) {
+    return params
+  }
+  const end = new Date()
+  const start = new Date()
+  start.setDate(end.getDate() - Math.max(0, params.days - 1))
+  return {
+    ...params,
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  } as T
+}
+
+function filterSessionsForUsage(sessions: SessionsListResult['sessions'], params?: SessionsUsageParams): SessionsListResult['sessions'] {
+  const normalized = applyUsageWindow(params)
+
+  return sessions.filter((session) => {
+    if (normalized?.key && session.key !== normalized.key) return false
+
+    const dateKey = toUsageDateKey(session.updatedAt, normalized)
+    if (normalized?.startDate && dateKey && dateKey < normalized.startDate) return false
+    if (normalized?.endDate && dateKey && dateKey > normalized.endDate) return false
+
+    return true
+  })
 }
 
 // ==========================================
@@ -316,6 +371,311 @@ class GatewayAPI implements DataAPI {
   }
 }
 
+class BridgeAPI implements DataAPI {
+  private async request<T = unknown>(method: string, params?: object) {
+    return bridgeRpc<T>(method, params)
+  }
+
+  async getHealth() {
+    const result = await getBridgeHealth()
+    return {
+      ok: result.ok,
+      uptimeMs: result.uptimeMs,
+    }
+  }
+
+  async getSnapshot() {
+    return this.request<Snapshot>('getSnapshot')
+  }
+
+  async getPresence() {
+    return this.request<PresenceEntry[]>('getPresence')
+  }
+
+  async getAgents() {
+    return this.request<AgentSummary[]>('getAgents')
+  }
+
+  async createAgent(params: AgentsCreateParams) {
+    return this.request<{ agentId: string }>('createAgent', params)
+  }
+
+  async updateAgent(params: AgentsUpdateParams) {
+    await this.request('updateAgent', params)
+  }
+
+  async deleteAgent(params: AgentsDeleteParams) {
+    await this.request('deleteAgent', params)
+  }
+
+  async agentFilesList(agentId: string) {
+    return this.request<AgentsFileEntry[]>('agentFilesList', { agentId })
+  }
+
+  async agentFilesGet(agentId: string, path: string) {
+    return this.request<string>('agentFilesGet', { agentId, path })
+  }
+
+  async agentFilesSet(agentId: string, path: string, content: string) {
+    await this.request('agentFilesSet', { agentId, path, content })
+  }
+
+  async installSkill(skillId: string) {
+    await this.request('installSkill', { skillId })
+  }
+
+  async getSessions(params?: SessionsListParams) {
+    return this.request<SessionsListResult>('getSessions', {
+      limit: 100,
+      includeDerivedTitles: true,
+      includeLastMessage: true,
+      ...params,
+    })
+  }
+
+  async patchSession(params: SessionsPatchParams) {
+    await this.request('patchSession', params)
+  }
+
+  async resetSession(key: string) {
+    await this.request('resetSession', { key })
+  }
+
+  async deleteSession(key: string) {
+    await this.request('deleteSession', { key })
+  }
+
+  async getSessionsUsage(params?: SessionsUsageParams) {
+    const [agents, sessionsResult] = await Promise.all([
+      this.getAgents(),
+      this.getSessions({
+        limit: params?.limit ?? 1000,
+        includeGlobal: true,
+        includeUnknown: true,
+        includeDerivedTitles: true,
+        includeLastMessage: true,
+      }),
+    ])
+
+    return normalizeSessionsUsageResult(
+      mockWorkspace.deriveUsageFromSessions(
+        filterSessionsForUsage(sessionsResult.sessions, params),
+        agents,
+      ),
+    )
+  }
+
+  async getUsageCost(params?: UsageCostParams) {
+    const usage = await this.getSessionsUsage(applyUsageWindow(params))
+    return normalizeUsageCostSummary(buildUsageCostSummary(usage))
+  }
+
+  async sendChatMessage(params: ChatSendParams) {
+    return this.request<ChatMessage[]>('sendChatMessage', params)
+  }
+
+  async getChannelsStatus() {
+    const result = await this.request<ChannelsStatusResult>('getChannelsStatus')
+    return normalizeChannelsStatusResult(result)
+  }
+
+  async getCronJobs() {
+    return this.request<CronJob[]>('getCronJobs')
+  }
+
+  async addCronJob(params: CronAddParams) {
+    return this.request<{ id: string }>('addCronJob', params)
+  }
+
+  async updateCronJob(params: CronUpdateParams) {
+    await this.request('updateCronJob', params)
+  }
+
+  async removeCronJob(params: CronRemoveParams) {
+    await this.request('removeCronJob', params)
+  }
+
+  async runCronJob(params: CronRunParams) {
+    await this.request('runCronJob', params)
+  }
+
+  async getCronRuns(params: CronRunsParams) {
+    return this.request<CronRunLogEntry[]>('getCronRuns', params)
+  }
+
+  async getLogs(params?: LogsTailParams) {
+    return this.request<LogEntry[]>('getLogs', {
+      limit: 200,
+      ...params,
+    })
+  }
+
+  async getModels() {
+    return this.request<ModelChoice[]>('getModels')
+  }
+
+  async getSkills() {
+    return this.request<SkillEntry[]>('getSkills')
+  }
+
+  async getNodes() {
+    return this.request<NodeListNode[]>('getNodes')
+  }
+
+  async getConfig() {
+    return this.request<Record<string, unknown>>('getConfig')
+  }
+
+  async getExecApprovals() {
+    return this.request<ExecApprovalRequest[]>('getExecApprovals')
+  }
+
+  async resolveExecApproval(requestId: string, decision: 'approved' | 'denied') {
+    await this.request('resolveExecApproval', { requestId, decision })
+  }
+}
+
+class HybridAPI implements DataAPI {
+  private readonly gateway = new GatewayAPI()
+  private readonly bridge = new BridgeAPI()
+
+  private async gatewayFirst<T>(gatewayCall: () => Promise<T>, bridgeCall: () => Promise<T>): Promise<T> {
+    try {
+      return await gatewayCall()
+    } catch {
+      return bridgeCall()
+    }
+  }
+
+  async getHealth() {
+    return this.gatewayFirst(() => this.gateway.getHealth(), () => this.bridge.getHealth())
+  }
+
+  async getSnapshot() {
+    return this.gatewayFirst(() => this.gateway.getSnapshot(), () => this.bridge.getSnapshot())
+  }
+
+  async getPresence() {
+    return this.gatewayFirst(() => this.gateway.getPresence(), () => this.bridge.getPresence())
+  }
+
+  async getAgents() {
+    return this.bridge.getAgents()
+  }
+
+  async createAgent(params: AgentsCreateParams) {
+    return this.bridge.createAgent(params)
+  }
+
+  async updateAgent(params: AgentsUpdateParams) {
+    await this.bridge.updateAgent(params)
+  }
+
+  async deleteAgent(params: AgentsDeleteParams) {
+    await this.bridge.deleteAgent(params)
+  }
+
+  async agentFilesList(agentId: string) {
+    return this.bridge.agentFilesList(agentId)
+  }
+
+  async agentFilesGet(agentId: string, path: string) {
+    return this.bridge.agentFilesGet(agentId, path)
+  }
+
+  async agentFilesSet(agentId: string, path: string, content: string) {
+    await this.bridge.agentFilesSet(agentId, path, content)
+  }
+
+  async installSkill(skillId: string) {
+    await this.bridge.installSkill(skillId)
+  }
+
+  async getSessions(params?: SessionsListParams) {
+    return this.gatewayFirst(() => this.gateway.getSessions(params), () => this.bridge.getSessions(params))
+  }
+
+  async patchSession(params: SessionsPatchParams) {
+    await this.gateway.patchSession(params)
+  }
+
+  async resetSession(key: string) {
+    await this.gateway.resetSession(key)
+  }
+
+  async deleteSession(key: string) {
+    await this.gateway.deleteSession(key)
+  }
+
+  async getSessionsUsage(params?: SessionsUsageParams) {
+    return this.gatewayFirst(() => this.gateway.getSessionsUsage(params), () => this.bridge.getSessionsUsage(params))
+  }
+
+  async getUsageCost(params?: UsageCostParams) {
+    return this.gatewayFirst(() => this.gateway.getUsageCost(params), () => this.bridge.getUsageCost(params))
+  }
+
+  async sendChatMessage(params: ChatSendParams) {
+    return this.gatewayFirst(() => this.gateway.sendChatMessage(params), () => this.bridge.sendChatMessage(params))
+  }
+
+  async getChannelsStatus() {
+    return this.gatewayFirst(() => this.gateway.getChannelsStatus(), () => this.bridge.getChannelsStatus())
+  }
+
+  async getCronJobs() {
+    return this.gatewayFirst(() => this.gateway.getCronJobs(), () => this.bridge.getCronJobs())
+  }
+
+  async addCronJob(params: CronAddParams) {
+    return this.gatewayFirst(() => this.gateway.addCronJob(params), () => this.bridge.addCronJob(params))
+  }
+
+  async updateCronJob(params: CronUpdateParams) {
+    await this.gatewayFirst(() => this.gateway.updateCronJob(params), () => this.bridge.updateCronJob(params))
+  }
+
+  async removeCronJob(params: CronRemoveParams) {
+    await this.gatewayFirst(() => this.gateway.removeCronJob(params), () => this.bridge.removeCronJob(params))
+  }
+
+  async runCronJob(params: CronRunParams) {
+    await this.gatewayFirst(() => this.gateway.runCronJob(params), () => this.bridge.runCronJob(params))
+  }
+
+  async getCronRuns(params: CronRunsParams) {
+    return this.gatewayFirst(() => this.gateway.getCronRuns(params), () => this.bridge.getCronRuns(params))
+  }
+
+  async getLogs(params?: LogsTailParams) {
+    return this.gatewayFirst(() => this.gateway.getLogs(params), () => this.bridge.getLogs(params))
+  }
+
+  async getModels() {
+    return this.gatewayFirst(() => this.gateway.getModels(), () => this.bridge.getModels())
+  }
+
+  async getSkills() {
+    return this.gatewayFirst(() => this.gateway.getSkills(), () => this.bridge.getSkills())
+  }
+
+  async getNodes() {
+    return this.gatewayFirst(() => this.gateway.getNodes(), () => this.bridge.getNodes())
+  }
+
+  async getConfig() {
+    return this.gatewayFirst(() => this.gateway.getConfig(), () => this.bridge.getConfig())
+  }
+
+  async getExecApprovals() {
+    return this.gatewayFirst(() => this.gateway.getExecApprovals(), () => this.bridge.getExecApprovals())
+  }
+
+  async resolveExecApproval(requestId: string, decision: 'approved' | 'denied') {
+    await this.gateway.resolveExecApproval(requestId, decision)
+  }
+}
+
 // ==========================================
 // 日志行解析（OpenClaw logs.tail 返回原始字符串行）
 // ==========================================
@@ -436,12 +796,28 @@ const mockAPI: DataAPI = {
 // ==========================================
 
 let cachedGatewayAPI: GatewayAPI | null = null
+let cachedBridgeAPI: BridgeAPI | null = null
+let cachedHybridAPI: HybridAPI | null = null
 
 export function getAPI(): DataAPI {
   const config = loadConfig()
 
   if (config.useMockData) {
     return mockAPI
+  }
+
+  if (usesBridgeTransport(config) && usesGatewayTransport(config)) {
+    if (!cachedHybridAPI) {
+      cachedHybridAPI = new HybridAPI()
+    }
+    return cachedHybridAPI
+  }
+
+  if (usesBridgeTransport(config)) {
+    if (!cachedBridgeAPI) {
+      cachedBridgeAPI = new BridgeAPI()
+    }
+    return cachedBridgeAPI
   }
 
   if (!cachedGatewayAPI) {
@@ -452,4 +828,6 @@ export function getAPI(): DataAPI {
 
 export function resetAPIClient(): void {
   cachedGatewayAPI = null
+  cachedBridgeAPI = null
+  cachedHybridAPI = null
 }

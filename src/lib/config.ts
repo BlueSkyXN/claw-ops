@@ -1,11 +1,14 @@
 // claw-ops 连接配置
-// 支持两种运行模式：demo / realtime
-// demo 使用内置 Mock 数据，realtime 通过 WebSocket JSON-RPC 连接 OpenClaw Gateway
+// demo: 内置 Mock 数据
+// realtime: 仅通过 Gateway WebSocket 连接 OpenClaw
+// cli: 仅通过本地 bridge + openclaw CLI 连接 OpenClaw
+// hybrid: bridge 负责本地文件/CLI 面，Gateway 保留实时观测与控制
 
 import type { MockExperienceSummary } from '../data/mock-workspace'
 import type { GatewayScope, AuthMode } from '../types/openclaw'
+import type { BridgeCapabilities } from '../types/bridge'
 
-export type AppMode = 'demo' | 'realtime'
+export type AppMode = 'demo' | 'realtime' | 'cli' | 'hybrid'
 
 export interface OpenClawConfig {
   // 运行模式
@@ -18,6 +21,12 @@ export interface OpenClawConfig {
   authToken: string
   // 认证密码（authType=password 时使用）
   authPassword: string
+  // 本地 bridge 地址（cli / hybrid 模式）
+  bridgeUrl: string
+  // 本地 bridge 访问令牌（可选）
+  bridgeAuthToken: string
+  // 最近一次 Setup 连接测试记录到的 bridge 能力
+  bridgeCapabilities?: BridgeCapabilities | null
   // 请求的权限范围
   scopes: GatewayScope[]
   // 数据刷新间隔 (秒，用于 mock 模式的模拟刷新)
@@ -38,7 +47,7 @@ const REQUIRED_GATEWAY_SCOPES: GatewayScope[] = ['operator.read', 'operator.writ
 function getEnvMode(): AppMode | null {
   try {
     const envMode = import.meta.env.VITE_APP_MODE as string | undefined
-    if (envMode === 'demo' || envMode === 'realtime') {
+    if (envMode === 'demo' || envMode === 'realtime' || envMode === 'cli' || envMode === 'hybrid') {
       return envMode
     }
     // 兼容旧配置：standalone 映射为 demo
@@ -55,6 +64,9 @@ const DEFAULT_CONFIG: OpenClawConfig = {
   authType: 'token',
   authToken: '',
   authPassword: '',
+  bridgeUrl: 'http://127.0.0.1:18796',
+  bridgeAuthToken: '',
+  bridgeCapabilities: null,
   scopes: REQUIRED_GATEWAY_SCOPES,
   refreshInterval: 30,
   useMockData: true,
@@ -73,12 +85,15 @@ function normalizeConfig(raw: Partial<OpenClawConfig>): OpenClawConfig {
   config.scopes = normalizeScopes(config.scopes)
   // 兼容旧配置：standalone 映射为 demo
   if ((config.mode as string) === 'standalone') config.mode = 'demo'
-  config.useMockData = config.mode !== 'realtime'
+  config.useMockData = config.mode === 'demo'
   // 迁移旧 http URL 到 ws
   if (config.gatewayUrl.startsWith('http://')) {
     config.gatewayUrl = config.gatewayUrl.replace('http://', 'ws://')
   } else if (config.gatewayUrl.startsWith('https://')) {
     config.gatewayUrl = config.gatewayUrl.replace('https://', 'wss://')
+  }
+  if (config.bridgeUrl.endsWith('/')) {
+    config.bridgeUrl = config.bridgeUrl.replace(/\/+$/, '')
   }
   return config
 }
@@ -115,10 +130,9 @@ export function clearConfig(): void {
 
 export function isConfigured(): boolean {
   const config = loadConfig()
-  if (config.mode !== 'realtime') return false
-  if (!config.gatewayUrl) return false
-  if (config.authType === 'token' && !config.authToken) return false
-  if (config.authType === 'password' && !config.authPassword) return false
+  if (config.mode === 'demo') return true
+  if (usesBridgeTransport(config) && !config.bridgeUrl) return false
+  if (usesGatewayTransport(config) && !config.gatewayUrl) return false
   return true
 }
 
@@ -127,10 +141,74 @@ export function getDefaultConfig(): OpenClawConfig {
 }
 
 export function isMockMode(config: OpenClawConfig): boolean {
-  return config.mode !== 'realtime'
+  return config.mode === 'demo'
+}
+
+export function usesGatewayTransport(config: OpenClawConfig): boolean {
+  return config.mode === 'realtime' || config.mode === 'hybrid'
+}
+
+export function usesBridgeTransport(config: OpenClawConfig): boolean {
+  return config.mode === 'cli' || config.mode === 'hybrid'
+}
+
+export interface RuntimeCapabilitySummary {
+  realtimeEvents: boolean
+  sessionMutations: boolean
+  approvals: boolean
+  agentFiles: boolean
+  bridgeEnabled: boolean
+  gatewayEnabled: boolean
+}
+
+export function getRuntimeCapabilities(config: OpenClawConfig = loadConfig()): RuntimeCapabilitySummary {
+  if (config.mode === 'demo') {
+    return {
+      realtimeEvents: false,
+      sessionMutations: true,
+      approvals: true,
+      agentFiles: true,
+      bridgeEnabled: false,
+      gatewayEnabled: false,
+    }
+  }
+
+  if (config.mode === 'realtime') {
+    return {
+      realtimeEvents: true,
+      sessionMutations: true,
+      approvals: true,
+      agentFiles: true,
+      bridgeEnabled: false,
+      gatewayEnabled: true,
+    }
+  }
+
+  if (config.mode === 'hybrid') {
+    return {
+      realtimeEvents: true,
+      sessionMutations: true,
+      approvals: true,
+      agentFiles: true,
+      bridgeEnabled: true,
+      gatewayEnabled: true,
+    }
+  }
+
+  const bridgeSupported = config.bridgeCapabilities?.supported
+  return {
+    realtimeEvents: false,
+    sessionMutations: Boolean(bridgeSupported?.sessionMutations),
+    approvals: Boolean(bridgeSupported?.approvals),
+    agentFiles: Boolean(bridgeSupported?.agentFiles),
+    bridgeEnabled: true,
+    gatewayEnabled: false,
+  }
 }
 
 export const MODE_LABELS: Record<AppMode, { name: string; icon: string; desc: string }> = {
-  demo:       { name: '演示模式', icon: '🎭', desc: '内置 Mock 数据，即刻体验全部功能' },
-  realtime:   { name: '实时模式', icon: '🔗', desc: 'WebSocket 连接 OpenClaw Gateway' },
+  demo:     { name: '演示模式', icon: '🎭', desc: '内置 Mock 数据，即刻体验全部功能' },
+  realtime: { name: '实时模式', icon: '🔗', desc: '仅通过 Gateway WebSocket 对接 OpenClaw' },
+  cli:      { name: 'CLI 模式', icon: '⌨️', desc: '通过本地 bridge + openclaw CLI 读取与管理 OpenClaw' },
+  hybrid:   { name: '混合模式', icon: '🪢', desc: 'bridge 负责本地 CLI/文件能力，Gateway 保留实时观测与控制' },
 }

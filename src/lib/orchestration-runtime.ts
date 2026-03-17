@@ -1,7 +1,7 @@
 import type { MockExperienceSummary } from '../data/mock-workspace'
 import type { ChatSendParams, LogEntry } from '../types/openclaw'
 import { getAPI, isMissingScopeError } from './api'
-import { loadConfig } from './config'
+import { getRuntimeCapabilities, loadConfig } from './config'
 import { ensureGatewayClient } from './gateway-client'
 import {
   buildExperienceSummaryRecord,
@@ -166,7 +166,17 @@ export async function loadOrchestrationRuntime(options?: { templateId?: string |
 }
 
 export function subscribeToOrchestrationEvents(onInvalidate: () => void): () => void {
-  const client = ensureGatewayClient()
+  const config = loadConfig()
+  if (config.useMockData) return () => {}
+
+  const capabilities = getRuntimeCapabilities(config)
+  if (!capabilities.realtimeEvents) {
+    const intervalMs = Math.max(5000, Math.min(15_000, config.refreshInterval * 1000))
+    const timer = window.setInterval(() => onInvalidate(), intervalMs)
+    return () => window.clearInterval(timer)
+  }
+
+  const client = ensureGatewayClient(config)
   if (!client) return () => {}
 
   const events = [

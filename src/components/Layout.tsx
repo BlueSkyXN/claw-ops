@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { loadConfig, MODE_LABELS } from '../lib/config'
+import { loadConfig, MODE_LABELS, usesGatewayTransport } from '../lib/config'
 import { getAPI } from '../lib/api'
 import { ensureGatewayClient, getGatewayClient } from '../lib/gateway-client'
 
@@ -39,9 +39,9 @@ export default function Layout() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [approvalCount, setApprovalCount] = useState(0)
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const gatewayConfigKey = config.mode === 'realtime'
+  const gatewayConfigKey = usesGatewayTransport(config)
     ? `${config.gatewayUrl}|${config.authType}|${config.authToken}|${config.authPassword}|${config.scopes.join(',')}`
-    : 'mock'
+    : 'no-gateway'
 
   const loadApprovalCount = useCallback(async () => {
     try {
@@ -146,14 +146,30 @@ export default function Layout() {
             className="flex items-center gap-2 text-xs text-text-secondary hover:text-brand-500 transition-colors mb-2"
           >
             <span>🛠️</span>
-            <span>{config.mode === 'demo' ? '模式设置' : '连接设置'}</span>
+            <span>{
+              config.mode === 'demo'
+                ? '模式设置'
+                : config.mode === 'cli'
+                  ? 'Bridge 设置'
+                  : config.mode === 'hybrid'
+                    ? '混合连接设置'
+                    : '连接设置'
+            }</span>
           </NavLink>
           <div className="flex items-center gap-2 text-xs text-text-secondary">
             <span className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />
             <span>{modeInfo.icon} {modeInfo.name}</span>
           </div>
           <p className="text-[10px] text-text-muted mt-1">
-            v0.1.0{config.mode === 'realtime' ? ' · Gateway' : ' · Mock'}
+            v0.1.0{
+              config.mode === 'realtime'
+                ? ' · Gateway'
+                : config.mode === 'cli'
+                  ? ' · Bridge CLI'
+                  : config.mode === 'hybrid'
+                    ? ' · Hybrid'
+                    : ' · Mock'
+            }
           </p>
         </div>
       </aside>

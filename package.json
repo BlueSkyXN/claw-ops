@@ -9,6 +9,7 @@
     "dev": "vite",
     "dev:standalone": "VITE_APP_MODE=standalone vite",
     "dev:demo": "VITE_APP_MODE=demo vite",
+    "bridge": "node bridge/server.mjs",
     "build": "tsc -b && vite build",
     "build:standalone": "VITE_APP_MODE=standalone tsc -b && VITE_APP_MODE=standalone vite build",
     "preview": "vite preview"

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { getAPI } from '../lib/api'
+import { getRuntimeCapabilities, loadConfig, MODE_LABELS } from '../lib/config'
 import type { GatewaySessionRow, SessionsListResult, AgentSummary } from '../types/openclaw'
 
 const channelEmoji: Record<string, string> = {
@@ -30,12 +31,20 @@ function relativeTime(ts: number | null): string {
   return `${Math.floor(h / 24)} 天前`
 }
 
-function SessionDetailPanel({ session, agents, onClose, onDelete, onReset }: {
+function formatErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  return '未知错误'
+}
+
+function SessionDetailPanel({ session, agents, onClose, onDelete, onReset, allowSessionMutations, mutationHint }: {
   session: GatewaySessionRow
   agents: AgentSummary[]
   onClose: () => void
   onDelete: (key: string) => void
   onReset: (key: string) => void
+  allowSessionMutations: boolean
+  mutationHint?: string
 }) {
   const agent = agents.find(a => session.key.includes(a.id))
 
@@ -134,15 +143,22 @@ function SessionDetailPanel({ session, agents, onClose, onDelete, onReset }: {
         </div>
 
         <div className="flex items-center gap-3 pt-4 border-t border-surface-border">
+          {!allowSessionMutations && mutationHint && (
+            <div className="flex-1 text-[11px] text-accent-yellow bg-pastel-yellow/20 border border-accent-yellow/20 rounded-xl px-3 py-2">
+              {mutationHint}
+            </div>
+          )}
           <button
             onClick={() => onReset(session.key)}
-            className="btn-secondary text-xs"
+            disabled={!allowSessionMutations}
+            className="btn-secondary text-xs disabled:opacity-40 disabled:cursor-not-allowed"
           >
             🔄 重置会话
           </button>
           <button
             onClick={() => onDelete(session.key)}
-            className="px-4 py-2 bg-pastel-red/20 text-accent-red border border-accent-red/20 rounded-xl hover:bg-pastel-red/40 transition-all text-xs font-medium"
+            disabled={!allowSessionMutations}
+            className="px-4 py-2 bg-pastel-red/20 text-accent-red border border-accent-red/20 rounded-xl hover:bg-pastel-red/40 transition-all text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed"
           >
             🗑️ 删除会话
           </button>
@@ -153,6 +169,8 @@ function SessionDetailPanel({ session, agents, onClose, onDelete, onReset }: {
 }
 
 export default function Sessions() {
+  const runtimeConfig = loadConfig()
+  const runtimeCaps = getRuntimeCapabilities(runtimeConfig)
   const [data, setData] = useState<SessionsListResult | null>(null)
   const [agents, setAgents] = useState<AgentSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -160,9 +178,15 @@ export default function Sessions() {
   const [kindFilter, setKindFilter] = useState('')
   const [search, setSearch] = useState('')
   const [selectedSession, setSelectedSession] = useState<GatewaySessionRow | null>(null)
+  const [notice, setNotice] = useState<{ type: 'info' | 'error'; message: string } | null>(null)
+
+  const mutationHint = runtimeConfig.mode === 'cli' && !runtimeCaps.sessionMutations
+    ? '当前 CLI 模式未接入官方 sessions.patch/reset/delete；会话详情仍可查看，但重置/删除按钮被显式禁用。'
+    : undefined
 
   const loadData = () => {
     setLoading(true)
+    setNotice((current) => (current?.type === 'error' ? null : current))
     Promise.all([
       getAPI().getSessions({ limit: 200, includeGlobal: true, includeUnknown: true, includeDerivedTitles: true, includeLastMessage: true }),
       getAPI().getAgents(),
@@ -171,7 +195,13 @@ export default function Sessions() {
         setData(sessionsResult)
         setAgents(agentsList)
       })
-      .catch(console.error)
+      .catch((error) => {
+        console.error(error)
+        setNotice({
+          type: 'error',
+          message: `会话数据加载失败：${formatErrorMessage(error)}`,
+        })
+      })
       .finally(() => setLoading(false))
   }
 
@@ -212,21 +242,43 @@ export default function Sessions() {
   }
 
   const handleDelete = async (key: string) => {
+    if (!runtimeCaps.sessionMutations) {
+      setNotice({ type: 'info', message: mutationHint ?? '当前模式不支持删除会话。' })
+      return
+    }
     if (!confirm('确定要删除此会话？此操作不可撤销。')) return
     try {
       await getAPI().deleteSession(key)
       setSelectedSession(null)
+      setNotice(null)
       loadData()
-    } catch (e) { console.error(e) }
+    } catch (error) {
+      console.error(error)
+      setNotice({
+        type: 'error',
+        message: `删除会话失败：${formatErrorMessage(error)}`,
+      })
+    }
   }
 
   const handleReset = async (key: string) => {
+    if (!runtimeCaps.sessionMutations) {
+      setNotice({ type: 'info', message: mutationHint ?? '当前模式不支持重置会话。' })
+      return
+    }
     if (!confirm('确定要重置此会话？历史消息将被清除。')) return
     try {
       await getAPI().resetSession(key)
       setSelectedSession(null)
+      setNotice(null)
       loadData()
-    } catch (e) { console.error(e) }
+    } catch (error) {
+      console.error(error)
+      setNotice({
+        type: 'error',
+        message: `重置会话失败：${formatErrorMessage(error)}`,
+      })
+    }
   }
 
   return (
@@ -250,6 +302,35 @@ export default function Sessions() {
           <span className="stat-value">{formatTokens(stats.tokens)}</span>
         </div>
       </div>
+
+      {(mutationHint || notice) && (
+        <div
+          className={`card p-4 text-sm ${
+            notice?.type === 'error'
+              ? 'border border-accent-red/20 bg-pastel-red/20 text-accent-red'
+              : 'border border-accent-yellow/20 bg-pastel-yellow/20 text-accent-yellow'
+          }`}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              {mutationHint && (
+                <div className="font-medium mb-1">
+                  {MODE_LABELS[runtimeConfig.mode].icon} {MODE_LABELS[runtimeConfig.mode].name} 能力提示
+                </div>
+              )}
+              <div>{notice?.message ?? mutationHint}</div>
+            </div>
+            {notice && (
+              <button
+                onClick={() => setNotice(null)}
+                className="text-xs opacity-70 hover:opacity-100"
+              >
+                关闭
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="card p-4">
@@ -393,6 +474,8 @@ export default function Sessions() {
           onClose={() => setSelectedSession(null)}
           onDelete={handleDelete}
           onReset={handleReset}
+          allowSessionMutations={runtimeCaps.sessionMutations}
+          mutationHint={mutationHint}
         />
       )}
     </div>

@@ -18,17 +18,15 @@ OpenClaw Gateway 的配套运维可视化前端（纯前端 SPA）。通过 WebS
 | 📈 **用量分析** (Usage) | 对齐 OpenClaw `sessions.usage` + `usage.cost` 双接口、Token/费用趋势图、按模型/供应商/智能体/渠道聚合、Top 20 会话、真实数据渲染上限保护 |
 | 🧩 **编排** (Orchestration) | 企业级编排控制面：Mission 发令、任务追踪、路径高亮、活策略面板、审批门禁、暂停/催办/重派、通道拓扑、组织架构；控制面负责入口投递，后续优先由角色原生自编排推进 |
 | 📜 **日志** (Logs) | 实时日志流、级别/来源筛选、自动滚动、CSV 导出 |
-| ⚙️ **配置** (Setup) | 4 步配置向导：模式选择 → 网关地址与认证 → 连接测试 → 完成 |
+| ⚙️ **配置** (Setup) | 当前为 4 步配置向导：模式选择 → 连接配置 → 连接测试 → 完成；已支持 `demo` / `realtime` / `cli` / `hybrid` 四种模式 |
 
-## 🔌 三模式运行
+## 🔌 当前支持的运行模式
 
-### 独立开发模式 (standalone)（默认）
+### Demo 模式 (demo，默认 Mock 模式)
 
 纯前端看板，无需 OpenClaw 实例，使用内置 Mock 数据即刻体验全部页面功能。现在支持持久化 mock 工作区与一键导入团队模板，刷新后仍可继续体验。
 
-### Demo 演示模式 (demo)
-
-同样使用 Mock 数据，适合演示和评估。推荐直接进入 `🧩 编排` 页面导入 `OPC 超级助理` 或其他团队模板，快速展示多 Agent 混合编排能力。
+历史上的 `standalone` 环境变量与 `npm run dev:standalone` 仍然可用，但在当前实现里会被兼容映射到同一个 `demo`/Mock 运行态。
 
 ### 实时模式 (realtime)
 
@@ -36,10 +34,27 @@ OpenClaw Gateway 的配套运维可视化前端（纯前端 SPA）。通过 WebS
 
 1. 访问 `/setup` 进入配置向导
 2. 选择「实时模式」→ 填写网关 WebSocket 地址（如 `ws://127.0.0.1:18789`）
-3. 选择认证方式（Token 或 Password）→ 配置授权范围（scopes）
-4. 连接测试通过后自动切换为实时数据源
+3. 选择认证方式（Token 或 Password）→ 填写认证凭据
+4. 连接测试通过后完成配置，并进入实时看板
 
 实时模式下，所有页面通过 `GatewayClient` 发送 JSON-RPC 请求获取数据，并自动订阅 17 种网关事件实现实时更新。`📈 用量分析` 页面会并行读取 `sessions.usage` 与 `usage.cost`，并兼容旧网关对 `mode` / `utcOffset` 参数的拒绝回退；`📡 渠道` 页面按 `channels.status` 的 schema-light 快照渲染，兼容插件扩展字段。
+
+### CLI / Hybrid 对接（Bridge MVP 已落地）
+
+当前版本已经落地第一版 `cli` / `hybrid` 集成：
+
+- 新增本地 bridge 服务：`npm run bridge`
+- Setup 已支持 `demo` / `realtime` / `cli` / `hybrid`
+- `cli` 模式通过 bridge 读取 agents / sessions / channels / cron / logs / models / skills
+- `hybrid` 模式会保留 Gateway 实时能力，并叠加本地 bridge 的 CLI / agent file 能力
+
+当前仍然**显式未支持**的纯 CLI 能力包括：
+
+- `sessions.patch` / `sessions.reset` / `sessions.delete`
+- `exec approval resolve`
+- 真正的实时事件订阅（纯 CLI 仍采用 polling 降级）
+
+详见 [`docs/CLI-HYBRID-INTEGRATION.md`](docs/CLI-HYBRID-INTEGRATION.md)。
 
 ## 🚀 快速开始
 
@@ -47,12 +62,13 @@ OpenClaw Gateway 的配套运维可视化前端（纯前端 SPA）。通过 WebS
 # 安装依赖
 npm install
 
-# 开发模式（默认独立开发 Mock 模式）
+# 开发模式（默认 Demo / Mock 模式）
 npm run dev
 
 # 指定模式运行
-npm run dev:standalone   # 独立开发（Mock 数据）
-npm run dev:demo         # Demo 演示（Mock 数据）
+npm run dev:standalone   # 历史别名，仍映射到当前 Mock 模式
+npm run dev:demo         # Demo / Mock 模式
+npm run bridge           # 启动本地 CLI bridge（默认 http://127.0.0.1:18796）
 
 # 构建生产版本
 npm run build            # tsc -b && vite build
@@ -75,7 +91,15 @@ npm run preview
 
 1. 启动 OpenClaw Gateway（默认监听 `ws://127.0.0.1:18789`）
 2. 运行 `npm run dev`，打开浏览器访问 `http://localhost:39527/setup`
-3. 选择「实时模式」→ 输入网关地址 → 配置认证 Token → 测试连接 → 进入看板
+3. 选择「实时模式」→ 输入网关地址 → 配置认证 Token/Password → 测试连接 → 完成配置后进入看板
+
+### 使用本地 CLI / Hybrid
+
+1. 确保本机可执行 `openclaw` CLI
+2. 运行 `npm run bridge`
+3. 再运行 `npm run dev`，打开 `http://localhost:39527/setup`
+4. 选择「CLI 模式」或「混合模式」
+5. 配置 bridge 地址（默认 `http://127.0.0.1:18796`）；`hybrid` 模式额外填写 Gateway 地址并完成双连接测试
 
 ## 🏗️ 架构概览
 
@@ -196,7 +220,7 @@ claw-ops 使用的 OpenClaw JSON-RPC 方法（通过 WebSocket 调用）：
 
 | 分类 | 方法 | 说明 |
 |------|------|------|
-| 状态 | `health` `status` `system-presence` | 健康检查、系统快照、在线状态 |
+| 状态 | `health` `system-presence` | 健康检查、在线状态；系统快照来自连接握手的 `hello.ok` payload |
 | 智能体 | `agents.list` `agents.create` `agents.update` `agents.delete` | 智能体 CRUD |
 | 会话 / 用量 | `sessions.list` `sessions.patch` `sessions.reset` `sessions.delete` `sessions.usage` `usage.cost` | 会话管理与用量分析 |
 | Chat | `chat.send` | 控制面催办 / 重派 / 主动干预 |
@@ -214,6 +238,7 @@ claw-ops 使用的 OpenClaw JSON-RPC 方法（通过 WebSocket 调用）：
 |------|------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构详解（数据流、路由、配置模型） |
 | [docs/API-INTEGRATION.md](docs/API-INTEGRATION.md) | API 对接（JSON-RPC 方法、类型、认证） |
+| [docs/CLI-HYBRID-INTEGRATION.md](docs/CLI-HYBRID-INTEGRATION.md) | CLI / Hybrid 对接正式设计规格（规划中能力） |
 | [docs/PAGES.md](docs/PAGES.md) | 页面功能详解（每页的模块与数据源） |
 | [docs/COLOR-SYSTEM.md](docs/COLOR-SYSTEM.md) | 色彩系统（五层 Design Token） |
 | [OPENCLAW_API_REFERENCE.md](./OPENCLAW_API_REFERENCE.md) | OpenClaw 完整 API 参考 |
