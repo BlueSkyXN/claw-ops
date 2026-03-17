@@ -59,7 +59,7 @@ export class GatewayClient {
 
   constructor(options: GatewayClientOptions) {
     this.options = {
-      scopes: ['operator.read', 'operator.write'],
+      scopes: ['operator.read', 'operator.write', 'operator.admin'],
       clientName: DEFAULT_GATEWAY_CLIENT_ID,
       clientDisplayName: 'claw-ops',
       clientMode: 'webchat',

@@ -28,6 +28,7 @@ export interface OpenClawConfig {
 }
 
 const STORAGE_KEY = 'claw-ops-config'
+const REQUIRED_GATEWAY_SCOPES: GatewayScope[] = ['operator.read', 'operator.write', 'operator.admin']
 
 function getEnvMode(): AppMode | null {
   try {
@@ -49,13 +50,22 @@ const DEFAULT_CONFIG: OpenClawConfig = {
   authType: 'token',
   authToken: '',
   authPassword: '',
-  scopes: ['operator.read', 'operator.write'],
+  scopes: REQUIRED_GATEWAY_SCOPES,
   refreshInterval: 30,
   useMockData: true,
 }
 
+function normalizeScopes(scopes?: GatewayScope[]): GatewayScope[] {
+  const normalized = new Set<GatewayScope>(scopes ?? [])
+  for (const scope of REQUIRED_GATEWAY_SCOPES) {
+    normalized.add(scope)
+  }
+  return Array.from(normalized)
+}
+
 function normalizeConfig(raw: Partial<OpenClawConfig>): OpenClawConfig {
   const config = { ...DEFAULT_CONFIG, ...raw }
+  config.scopes = normalizeScopes(config.scopes)
   // 兼容旧配置：standalone 映射为 demo
   if ((config.mode as string) === 'standalone') config.mode = 'demo'
   config.useMockData = config.mode !== 'realtime'
@@ -81,9 +91,9 @@ export function loadConfig(): OpenClawConfig {
 }
 
 export function saveConfig(config: OpenClawConfig): void {
-  config.useMockData = config.mode !== 'realtime'
+  const normalized = normalizeConfig(config)
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
   } catch {
     // localStorage 可能在隐私模式或存储满时抛出异常
     console.warn('Failed to save config to localStorage')
