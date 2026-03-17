@@ -761,14 +761,17 @@ export function updateMockAgent(params: AgentsUpdateParams): void {
   commitWorkspace((workspace) => {
     workspace.agents = workspace.agents.map((agent) => {
       if (agent.id !== params.agentId) return agent
+      const identityPatch = params.identity ?? {}
       return {
         ...agent,
         name: params.name ?? agent.name,
         identity: {
           ...agent.identity,
-          name: params.name ?? agent.identity?.name ?? agent.name,
-          emoji: params.emoji ?? agent.identity?.emoji,
-          avatar: params.avatar ?? agent.identity?.avatar,
+          name: identityPatch.name ?? params.name ?? agent.identity?.name ?? agent.name,
+          emoji: identityPatch.emoji ?? params.emoji ?? agent.identity?.emoji,
+          avatar: identityPatch.avatar ?? params.avatar ?? agent.identity?.avatar,
+          avatarUrl: identityPatch.avatarUrl ?? agent.identity?.avatarUrl,
+          theme: identityPatch.theme ?? agent.identity?.theme,
         },
       }
     })

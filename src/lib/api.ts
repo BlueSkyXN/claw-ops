@@ -144,6 +144,22 @@ class GatewayAPI implements DataAPI {
     return client.request<T>(method, params)
   }
 
+  private normalizeAgentUpdateParams(params: AgentsUpdateParams): Record<string, unknown> {
+    const { agentId, name, model, identity, emoji, avatar } = params
+    const nextIdentity = {
+      ...(identity ?? {}),
+      ...(emoji ? { emoji } : {}),
+      ...(avatar ? { avatar } : {}),
+    }
+
+    return {
+      agentId,
+      ...(name ? { name } : {}),
+      ...(model ? { model } : {}),
+      ...(Object.keys(nextIdentity).length > 0 ? { identity: nextIdentity } : {}),
+    }
+  }
+
   async getHealth() {
     const client = await this.getClient()
     const result = await client.request<{ ok: boolean }>(GATEWAY_METHODS.HEALTH)
@@ -170,7 +186,7 @@ class GatewayAPI implements DataAPI {
   }
 
   async updateAgent(params: AgentsUpdateParams) {
-    await this.request(GATEWAY_METHODS.AGENTS_UPDATE, params)
+    await this.request(GATEWAY_METHODS.AGENTS_UPDATE, this.normalizeAgentUpdateParams(params))
   }
 
   async deleteAgent(params: AgentsDeleteParams) {

@@ -210,6 +210,7 @@ export interface AgentsUpdateParams {
   agentId: string
   name?: string
   model?: string
+  identity?: Partial<AgentIdentityInfo>
   avatar?: string
   emoji?: string
 }

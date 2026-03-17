@@ -225,9 +225,13 @@ export async function deployRole(
 
   // 后续步骤如果失败，回滚删除已创建的智能体
   try {
-    // 2. 更新元数据 (emoji)
+    // 2. 更新元数据 (identity)
     progress('update', '设置名称、emoji 与元数据...')
-    await api.updateAgent({ agentId, name: manifest.name, emoji: manifest.emoji })
+    await api.updateAgent({
+      agentId,
+      name: manifest.name,
+      identity: { emoji: manifest.emoji },
+    })
 
     // 3. 写入 SOUL.md
     progress('soul', '写入 SOUL.md 人设文件...')
