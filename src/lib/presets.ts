@@ -221,16 +221,16 @@ export async function deployRole(
   const { agentId } = await api.createAgent({
     name: manifest.id,
     workspace: `~/.openclaw/workspaces/${capabilities.oneClickDefaults.workspaceSuffix}`,
+    emoji: manifest.emoji,
   })
 
   // 后续步骤如果失败，回滚删除已创建的智能体
   try {
-    // 2. 更新元数据 (identity)
-    progress('update', '设置名称、emoji 与元数据...')
+    // 2. 更新名称元数据
+    progress('update', '设置显示名称...')
     await api.updateAgent({
       agentId,
       name: manifest.name,
-      identity: { emoji: manifest.emoji },
     })
 
     // 3. 写入 SOUL.md

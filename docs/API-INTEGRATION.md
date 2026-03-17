@@ -144,7 +144,7 @@ DataAPI 方法与 OpenClaw Gateway JSON-RPC 方法的映射关系：
 | `updateAgent()` | `agents.update` | 更新智能体 |
 | `deleteAgent()` | `agents.delete` | 删除智能体 |
 
-> 说明：实际网关侧的 identity 元数据更新更稳妥的形状是 `identity: { emoji, avatar, avatarUrl }`。`DataAPI.updateAgent()` 已在 API 层兼容旧的根级 `emoji` / `avatar` 调用，并在发送前归一化为嵌套 `identity` 结构。
+> 说明：网关 `agents.update` 仅接受 `agentId`、`name`、`workspace`、`model`、`avatar` 五个字段（`additionalProperties: false`）。`emoji` 仅在 `agents.create` 阶段通过 IDENTITY.md 写入。
 
 ### 会话
 

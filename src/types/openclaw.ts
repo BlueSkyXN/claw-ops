@@ -204,15 +204,16 @@ export interface AgentIdentity {
 export interface AgentsCreateParams {
   name: string
   workspace?: string
+  emoji?: string
+  avatar?: string
 }
 
 export interface AgentsUpdateParams {
   agentId: string
   name?: string
+  workspace?: string
   model?: string
-  identity?: Partial<AgentIdentityInfo>
   avatar?: string
-  emoji?: string
 }
 
 export interface AgentsDeleteParams {

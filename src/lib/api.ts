@@ -145,18 +145,14 @@ class GatewayAPI implements DataAPI {
   }
 
   private normalizeAgentUpdateParams(params: AgentsUpdateParams): Record<string, unknown> {
-    const { agentId, name, model, identity, emoji, avatar } = params
-    const nextIdentity = {
-      ...(identity ?? {}),
-      ...(emoji ? { emoji } : {}),
-      ...(avatar ? { avatar } : {}),
-    }
-
+    // 网关 agents.update 只接受: agentId, name, workspace, model, avatar
+    // 不接受 identity / emoji（emoji 仅 agents.create 支持）
+    const { agentId, name, model, avatar } = params
     return {
       agentId,
       ...(name ? { name } : {}),
       ...(model ? { model } : {}),
-      ...(Object.keys(nextIdentity).length > 0 ? { identity: nextIdentity } : {}),
+      ...(avatar ? { avatar } : {}),
     }
   }
 

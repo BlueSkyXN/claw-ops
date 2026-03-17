@@ -748,7 +748,8 @@ export function createMockAgent(params: AgentsCreateParams): { agentId: string }
       name: params.name,
       identity: {
         name: params.name,
-        emoji: '🤖',
+        emoji: params.emoji ?? '🤖',
+        avatar: params.avatar,
       },
     })
     workspace.agentFiles[agentId] = workspace.agentFiles[agentId] ?? {}
@@ -761,17 +762,13 @@ export function updateMockAgent(params: AgentsUpdateParams): void {
   commitWorkspace((workspace) => {
     workspace.agents = workspace.agents.map((agent) => {
       if (agent.id !== params.agentId) return agent
-      const identityPatch = params.identity ?? {}
       return {
         ...agent,
         name: params.name ?? agent.name,
         identity: {
           ...agent.identity,
-          name: identityPatch.name ?? params.name ?? agent.identity?.name ?? agent.name,
-          emoji: identityPatch.emoji ?? params.emoji ?? agent.identity?.emoji,
-          avatar: identityPatch.avatar ?? params.avatar ?? agent.identity?.avatar,
-          avatarUrl: identityPatch.avatarUrl ?? agent.identity?.avatarUrl,
-          theme: identityPatch.theme ?? agent.identity?.theme,
+          name: params.name ?? agent.identity?.name ?? agent.name,
+          avatar: params.avatar ?? agent.identity?.avatar,
         },
       }
     })
