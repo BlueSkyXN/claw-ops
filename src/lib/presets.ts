@@ -195,7 +195,7 @@ export async function loadTeamTemplate(templateId: string): Promise<PresetTeamTe
 
 /**
  * 部署单个预设角色到 OpenClaw Gateway
- * 流程: agents.create → agents.update → agents.files.set(SOUL.md) → skills.install
+ * 流程: agents.create → (等待配置热重载) → agents.update → agents.files.set(SOUL.md) → skills.install
  *
  * rolepack 元数据不写入网关（网关仅允许白名单 .md 文件），
  * 控制面通过本地预设库按需加载。
@@ -240,18 +240,25 @@ export async function deployRole(
     }
   }
 
+  // 新建后等待网关配置热重载（writeConfigFile 后 chokidar 有 ~300ms 防抖），
+  // 否则后续 agents.update / agents.files.set 会因 runtimeConfigSnapshot 过时而 "not found"。
+  if (isNew) {
+    await delay(500)
+  }
+
   // 后续步骤如果失败且是新建的智能体，回滚删除
   try {
-    // 2. 更新名称元数据
+    // 2. 更新名称元数据（带重试，防止配置热重载尚未完成）
     progress('update', '设置显示名称...')
-    await api.updateAgent({
-      agentId,
-      name: manifest.name,
+    await retry(() => api.updateAgent({ agentId, name: manifest.name }), {
+      retries: 3, delayMs: 400, shouldRetry: isAgentNotFoundError,
     })
 
     // 3. 写入 SOUL.md
     progress('soul', '写入 SOUL.md 人设文件...')
-    await api.agentFilesSet(agentId, 'SOUL.md', soulContent)
+    await retry(() => api.agentFilesSet(agentId, 'SOUL.md', soulContent), {
+      retries: 3, delayMs: 400, shouldRetry: isAgentNotFoundError,
+    })
 
     // 4. 安装技能
     for (const skillId of capabilities.requiredSkills) {
@@ -277,6 +284,36 @@ export async function deployRole(
 function isAgentAlreadyExistsError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err)
   return /already exists/i.test(msg)
+}
+
+/** 判断是否为 "agent not found" / "unknown agent id" 错误（配置热重载未完成） */
+function isAgentNotFoundError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return /not found|unknown agent/i.test(msg)
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function retry<T>(
+  fn: () => Promise<T>,
+  opts: { retries: number; delayMs: number; shouldRetry: (err: unknown) => boolean },
+): Promise<T> {
+  let lastErr: unknown
+  for (let i = 0; i <= opts.retries; i++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastErr = err
+      if (i < opts.retries && opts.shouldRetry(err)) {
+        await delay(opts.delayMs)
+      } else {
+        throw err
+      }
+    }
+  }
+  throw lastErr
 }
 
 /**
