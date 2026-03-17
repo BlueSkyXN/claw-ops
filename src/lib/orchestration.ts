@@ -5,6 +5,7 @@ import {
   loadRoleDetail,
   loadTeamTemplate,
   ROLEPACK_FILE_NAME,
+  type DeployProgress,
   type PresetRoleDetail,
 } from './presets'
 import { buildOrchestrationSessionMetadata } from './orchestration-metadata'
@@ -920,7 +921,10 @@ export function buildExperienceSummaryRecord(experience: LoadedExperiencePreset)
   }
 }
 
-export async function importExperiencePreset(templateId: string): Promise<LoadedExperiencePreset> {
+export async function importExperiencePreset(
+  templateId: string,
+  onProgress?: (roleId: string, progress: DeployProgress) => void,
+): Promise<LoadedExperiencePreset> {
   const experience = await loadExperiencePreset(templateId)
   const config = loadConfig()
   const experienceSummary = buildExperienceSummaryRecord(experience)
@@ -934,7 +938,7 @@ export async function importExperiencePreset(templateId: string): Promise<Loaded
   if (config.useMockData) {
     applyMockWorkspaceSeed(buildExperienceState(experience))
   } else {
-    await deployTeam(templateId)
+    await deployTeam(templateId, onProgress)
   }
 
   return experience

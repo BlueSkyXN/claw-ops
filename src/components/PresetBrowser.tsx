@@ -2,7 +2,8 @@
 // 展示预设库中所有角色与团队模板，支持单角色导入与批量导入
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { loadManifest, loadRoleDetail, loadTeamTemplate, deployRole, deployTeam } from '../lib/presets'
+import { loadManifest, loadRoleDetail, loadTeamTemplate, deployRole } from '../lib/presets'
+import { importExperiencePreset } from '../lib/orchestration'
 import type { PresetLibraryManifest, PresetLayer, PresetTeamTemplate } from '../types/presets'
 import type { PresetRoleDetail, DeployProgress } from '../lib/presets'
 
@@ -362,7 +363,7 @@ export default function PresetBrowser({ onImported }: { onImported: () => void }
     setDeployingTeamId(templateId)
     setTeamDeployProgress(null)
     try {
-      await deployTeam(templateId, (roleId, step) => {
+      await importExperiencePreset(templateId, (roleId, step) => {
         const roleIndex = template.roles.indexOf(roleId)
         const roleName = manifest?.roles.find((role) => role.id === roleId)?.name ?? roleId
         setTeamDeployProgress({
