@@ -1,8 +1,10 @@
 import type { MockExperienceSummary } from '../data/mock-workspace'
 import type { ChatSendParams, LogEntry } from '../types/openclaw'
 import { getAPI, isMissingScopeError } from './api'
+import { loadConfig } from './config'
 import { ensureGatewayClient } from './gateway-client'
 import {
+  buildExperienceSummaryRecord,
   loadExperiencePreset,
   type LoadedExperiencePreset,
 } from './orchestration'
@@ -88,6 +90,7 @@ async function safeGetExecApprovals(api: ReturnType<typeof getAPI>) {
 
 export async function loadOrchestrationRuntime(options?: { templateId?: string | null }): Promise<OrchestrationRuntime> {
   const api = getAPI()
+  const localConfig = loadConfig()
   const [agents, sessionsResult, usage, channels, approvals, logs, nodes, config] = await Promise.all([
     api.getAgents(),
     api.getSessions({ limit: 200, includeGlobal: true, includeDerivedTitles: true, includeLastMessage: true }),
@@ -100,16 +103,32 @@ export async function loadOrchestrationRuntime(options?: { templateId?: string |
   ])
 
   const experience = isExperienceSummary(config.experience) ? config.experience : null
-  const selectedTemplateId = options?.templateId ?? experience?.templateId ?? null
-  const activeTemplateId = experience?.templateId ?? null
+  const fallbackExperience = !localConfig.useMockData && localConfig.activeExperienceSummary
+    ? localConfig.activeExperienceSummary
+    : null
+  const fallbackActiveTemplateId = !localConfig.useMockData
+    ? localConfig.activeExperienceTemplateId ?? fallbackExperience?.templateId ?? null
+    : null
+  const selectedTemplateId = options?.templateId ?? experience?.templateId ?? fallbackActiveTemplateId ?? null
+  const activeTemplateId = experience?.templateId ?? fallbackActiveTemplateId ?? null
   const [selectedExperience, activeExperiencePreset] = await Promise.all([
     safeLoadPreset(selectedTemplateId),
     safeLoadPreset(activeTemplateId),
   ])
 
-  const runtimePreset = activeExperiencePreset ?? selectedExperience
+  const derivedActiveExperiencePreset = activeExperiencePreset ?? (
+    activeTemplateId && selectedExperience?.template.id === activeTemplateId
+      ? selectedExperience
+      : null
+  )
+  const runtimePreset = derivedActiveExperiencePreset ?? selectedExperience
+  const resolvedExperience = experience ?? (
+    derivedActiveExperiencePreset
+      ? buildExperienceSummaryRecord(derivedActiveExperiencePreset)
+      : fallbackExperience
+  )
   const tasks = buildTrackedTasks({
-    experience,
+    experience: resolvedExperience,
     loadedExperience: runtimePreset,
     agents,
     sessions: sessionsResult.sessions,
@@ -119,7 +138,7 @@ export async function loadOrchestrationRuntime(options?: { templateId?: string |
   })
   const taskSummary = summarizeTrackedTasks(tasks)
   const health = analyzeOrchestrationHealth({
-    experience,
+    experience: resolvedExperience,
     loadedExperience: runtimePreset,
     tasks,
     usage,
@@ -137,9 +156,9 @@ export async function loadOrchestrationRuntime(options?: { templateId?: string |
     logs,
     nodes,
     config,
-    experience,
+    experience: resolvedExperience,
     selectedExperience,
-    activeExperiencePreset,
+    activeExperiencePreset: derivedActiveExperiencePreset,
     tasks,
     taskSummary,
     health,

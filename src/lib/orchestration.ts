@@ -1,4 +1,4 @@
-import { loadConfig } from './config'
+import { loadConfig, saveConfig } from './config'
 import {
   deployTeam,
   loadManifest,
@@ -897,9 +897,39 @@ function buildExperienceState(experience: LoadedExperiencePreset): MockWorkspace
   }
 }
 
+export function buildExperienceSummaryRecord(experience: LoadedExperiencePreset): MockExperienceSummary {
+  return {
+    id: experience.summary.id,
+    name: experience.summary.name,
+    tagline: experience.summary.tagline,
+    description: experience.summary.description,
+    templateId: experience.template.id,
+    roleIds: experience.template.roles,
+    quickStarts: experience.summary.quickStarts.map((quickStart) => ({
+      id: quickStart.id,
+      title: quickStart.title,
+      user: quickStart.user,
+      channel: quickStart.channel,
+      prompt: quickStart.prompt,
+    })),
+    quickStartCount: experience.summary.quickStarts.length,
+    layerCounts: experience.summary.layerCounts,
+    handoffCount: experience.summary.handoffCount,
+    channelIds: experience.summary.channelBlueprints.map((channel) => channel.id),
+    importedAtMs: Date.now(),
+  }
+}
+
 export async function importExperiencePreset(templateId: string): Promise<LoadedExperiencePreset> {
   const experience = await loadExperiencePreset(templateId)
   const config = loadConfig()
+  const experienceSummary = buildExperienceSummaryRecord(experience)
+
+  saveConfig({
+    ...config,
+    activeExperienceTemplateId: experience.template.id,
+    activeExperienceSummary: experienceSummary,
+  })
 
   if (config.useMockData) {
     applyMockWorkspaceSeed(buildExperienceState(experience))

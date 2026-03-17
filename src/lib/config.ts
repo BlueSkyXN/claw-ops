@@ -2,6 +2,7 @@
 // 支持两种运行模式：demo / realtime
 // demo 使用内置 Mock 数据，realtime 通过 WebSocket JSON-RPC 连接 OpenClaw Gateway
 
+import type { MockExperienceSummary } from '../data/mock-workspace'
 import type { GatewayScope, AuthMode } from '../types/openclaw'
 
 export type AppMode = 'demo' | 'realtime'
@@ -23,6 +24,10 @@ export interface OpenClawConfig {
   refreshInterval: number
   // 兼容字段：demo → true, realtime → false
   useMockData: boolean
+  // 实时模式下记录最近一次由控制面导入/激活的团队模板
+  activeExperienceTemplateId?: string
+  // 网关未回写 experience 时，保留一份本地体验摘要供 UI 恢复
+  activeExperienceSummary?: MockExperienceSummary | null
   // 连接后由 gateway 报告的认证模式
   detectedAuthMode?: AuthMode
 }

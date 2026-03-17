@@ -16,6 +16,7 @@ import '@xyflow/react/dist/style.css'
 import dagre from 'dagre'
 import type { ChannelAccountSnapshot, ChannelsStatusResult } from '../types/openclaw'
 import { getAPI } from '../lib/api'
+import { loadConfig } from '../lib/config'
 import {
   getChannelDisplay,
   getRoleLayerLabel,
@@ -817,7 +818,11 @@ export default function Orchestration() {
         ])
         if (cancelled) return
         setPresets(presetList)
-        const defaultId = (isExperienceSummary(config.experience) ? config.experience.templateId : null) ?? presetList[0]?.id ?? null
+        const localConfig = loadConfig()
+        const defaultId = (isExperienceSummary(config.experience) ? config.experience.templateId : null)
+          ?? (!localConfig.useMockData ? localConfig.activeExperienceTemplateId ?? localConfig.activeExperienceSummary?.templateId ?? null : null)
+          ?? presetList[0]?.id
+          ?? null
         setSelectedTemplateId(defaultId)
         if (!defaultId) {
           setLoading(false)
