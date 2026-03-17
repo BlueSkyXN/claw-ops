@@ -196,15 +196,15 @@ class GatewayAPI implements DataAPI {
     return result?.files ?? []
   }
 
-  async agentFilesGet(agentId: string, path: string) {
+  async agentFilesGet(agentId: string, name: string) {
     const result = await this.request<{ content: string }>(
-      GATEWAY_METHODS.AGENTS_FILES_GET, { agentId, path }
+      GATEWAY_METHODS.AGENTS_FILES_GET, { agentId, name }
     )
     return result?.content ?? ''
   }
 
-  async agentFilesSet(agentId: string, path: string, content: string) {
-    await this.request(GATEWAY_METHODS.AGENTS_FILES_SET, { agentId, path, content })
+  async agentFilesSet(agentId: string, name: string, content: string) {
+    await this.request(GATEWAY_METHODS.AGENTS_FILES_SET, { agentId, name, content })
   }
 
   async installSkill(skillId: string) {
