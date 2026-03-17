@@ -27,7 +27,7 @@ export interface PresetRoleDetail {
 
 /** 部署进度回调参数 */
 export interface DeployProgress {
-  step: 'create' | 'update' | 'soul' | 'rolepack' | 'skills' | 'done'
+  step: 'create' | 'update' | 'soul' | 'skills' | 'done'
   current: number
   total: number
   label: string
@@ -195,8 +195,10 @@ export async function loadTeamTemplate(templateId: string): Promise<PresetTeamTe
 
 /**
  * 部署单个预设角色到 OpenClaw Gateway
- * 流程: agents.create → agents.update → agents.files.set(SOUL.md) →
- *       agents.files.set(claw-ops.rolepack.json) → skills.install
+ * 流程: agents.create → agents.update → agents.files.set(SOUL.md) → skills.install
+ *
+ * rolepack 元数据不写入网关（网关仅允许白名单 .md 文件），
+ * 控制面通过本地预设库按需加载。
  *
  * 若同名智能体已存在，跳过创建步骤、直接覆盖更新（幂等）。
  */
@@ -206,11 +208,11 @@ export async function deployRole(
 ): Promise<string> {
   const detail = await loadRoleDetail(roleId)
   const api = getAPI()
-  const { manifest, capabilities, soulContent, rolepackContent } = detail
+  const { manifest, capabilities, soulContent } = detail
 
-  // 总步骤: create(1) + update(1) + files(2) + skills(N)
+  // 总步骤: create(1) + update(1) + soul(1) + skills(N) + done(1)
   const skillCount = capabilities.requiredSkills.length
-  const totalSteps = 2 + 2 + skillCount + 1
+  const totalSteps = 3 + skillCount + 1
   let step = 0
 
   const progress = (s: DeployProgress['step'], label: string) => {
@@ -232,7 +234,6 @@ export async function deployRole(
     isNew = true
   } catch (err) {
     if (isAgentAlreadyExistsError(err)) {
-      // 同名智能体已存在，复用其 ID 并继续覆盖更新
       agentId = manifest.id
     } else {
       throw err
@@ -252,22 +253,16 @@ export async function deployRole(
     progress('soul', '写入 SOUL.md 人设文件...')
     await api.agentFilesSet(agentId, 'SOUL.md', soulContent)
 
-    // 4. 写入 claw-ops 控制面 rolepack
-    progress('rolepack', `写入 ${ROLEPACK_FILE_NAME} 控制面元数据...`)
-    await api.agentFilesSet(agentId, ROLEPACK_FILE_NAME, rolepackContent)
-
-    // 5. 安装技能
+    // 4. 安装技能
     for (const skillId of capabilities.requiredSkills) {
       progress('skills', `安装技能: ${skillId}...`)
       try {
         await api.installSkill(skillId)
       } catch {
-        // 技能安装失败不阻断流程，仅跳过
         console.warn(`技能 ${skillId} 安装失败，已跳过`)
       }
     }
   } catch (err) {
-    // 仅回滚本次新建的智能体，已存在的不删除
     if (isNew) {
       try { await api.deleteAgent({ agentId }) } catch { /* 回滚失败不抛出 */ }
     }
