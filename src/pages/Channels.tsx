@@ -18,14 +18,14 @@ function relativeTime(ts: number | undefined | null): string {
 }
 
 function getAccountStatus(account: ChannelAccountSnapshot): { label: string; cls: string; dot: string } {
-  if (!account.enabled) return { label: '已禁用', cls: 'bg-surface-hover text-text-secondary', dot: 'bg-text-muted' }
+  if (account.enabled === false) return { label: '已禁用', cls: 'bg-surface-hover text-text-secondary', dot: 'bg-text-muted' }
   if (account.lastError) return { label: '错误', cls: 'bg-pastel-red/30 text-accent-red', dot: 'bg-accent-red' }
   if (account.connected) return { label: '已连接', cls: 'bg-pastel-green/30 text-accent-green', dot: 'bg-accent-green' }
   if (account.running) return { label: '运行中', cls: 'bg-pastel-yellow/30 text-accent-yellow', dot: 'bg-accent-yellow' }
   return { label: '离线', cls: 'bg-surface-hover text-text-secondary', dot: 'bg-text-muted' }
 }
 
-function StatusDot({ active, label }: { active: boolean | undefined; label: string }) {
+function StatusDot({ active, label }: { active: boolean | null | undefined; label: string }) {
   return (
     <span className="inline-flex items-center gap-1 text-[10px]">
       <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-accent-green' : 'bg-surface-border'}`} />
@@ -82,7 +82,7 @@ function AccountRow({ account }: { account: ChannelAccountSnapshot }) {
       </div>
 
       {/* Reconnect info */}
-      {account.reconnectAttempts !== undefined && account.reconnectAttempts > 0 && (
+      {(account.reconnectAttempts ?? 0) > 0 && (
         <div className="text-xs text-accent-yellow flex items-center gap-1">
           ⚠️ 重连尝试: {account.reconnectAttempts} 次
         </div>
@@ -206,8 +206,10 @@ export default function Channels() {
   const channelAccounts = data?.channelAccounts ?? {}
 
   const getEmoji = (channelId: string): string => {
-    const meta = data?.channelMeta?.find(m => m.id === channelId)
-    return meta?.systemImage || defaultChannelEmoji[channelId] || '📡'
+    const meta = Array.isArray(data?.channelMeta)
+      ? data.channelMeta.find((entry) => entry.id === channelId)
+      : undefined
+    return meta?.systemImage || data?.channelSystemImages?.[channelId] || defaultChannelEmoji[channelId] || '📡'
   }
 
   const stats = useMemo(() => {

@@ -8,6 +8,7 @@ import type {
 } from '../types/openclaw'
 import type { PresetLayer, PresetTeamWorkflowStep } from '../types/presets'
 import type { LoadedExperiencePreset } from './orchestration'
+import { getSessionUsageTotals } from './usage'
 
 export type TaskStatus = 'active' | 'waiting' | 'completed' | 'stalled' | 'failed' | 'blocked'
 export type TaskStepStatus = 'pending' | 'running' | 'completed' | 'waiting' | 'blocked' | 'failed'
@@ -356,7 +357,7 @@ function dedupe<T>(items: T[]): T[] {
 
 function sumUsage(usage: SessionsUsageResult | null, sessionKeys: string[]) {
   const byKey = new Map(
-    usage?.sessions.map((entry) => [entry.key, entry.usage?.totals ?? null]) ?? [],
+    usage?.sessions.map((entry) => [entry.key, getSessionUsageTotals(entry.usage)]) ?? [],
   )
 
   return sessionKeys.reduce((acc, key) => {
@@ -453,7 +454,9 @@ export function buildTrackedTasks({
     const updatedAt = allTimestamps.length > 0 ? Math.max(...allTimestamps) : Date.now()
 
     const steps: TaskStep[] = []
-    const rootTotals = usage?.sessions.find((entry) => entry.key === rootSession.key)?.usage?.totals
+    const rootTotals = getSessionUsageTotals(
+      usage?.sessions.find((entry) => entry.key === rootSession.key)?.usage,
+    )
     const rootApproval = relevantApprovals.find((approval) => approval.sessionKey === rootSession.key)
     steps.push({
       id: `${taskId}-owner`,
@@ -482,7 +485,9 @@ export function buildTrackedTasks({
 
     realizedWorkflowSessions.forEach(({ workflowStep, session, parsed: realizedKey }) => {
       const approval = relevantApprovals.find((item) => item.sessionKey === session.key)
-      const usageEntry = usage?.sessions.find((entry) => entry.key === session.key)?.usage?.totals
+      const usageEntry = getSessionUsageTotals(
+        usage?.sessions.find((entry) => entry.key === session.key)?.usage,
+      )
       const hasDownstreamRealized = realizedWorkflowSessions.some((candidate) => {
         if (!candidate.parsed.fromRoleId || !realizedKey.toRoleId) return false
         return candidate.parsed.fromRoleId === realizedKey.toRoleId && (candidate.session.updatedAt ?? 0) >= (session.updatedAt ?? 0)

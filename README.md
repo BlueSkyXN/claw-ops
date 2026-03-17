@@ -15,7 +15,7 @@ OpenClaw Gateway 的配套运维可视化前端（纯前端 SPA）。通过 WebS
 | 💬 **会话** (Sessions) | 会话列表表格（渠道/类型/Token 用量）、筛选搜索、会话详情、重置/删除操作 |
 | 📡 **渠道** (Channels) | 渠道连接状态、账户列表、4 态状态灯（configured/linked/running/connected）、出入站活动时间 |
 | ⏰ **定时任务** (CronJobs) | Cron 任务 CRUD、调度类型（at/every/cron）、运行日志、手动触发 |
-| 📈 **用量分析** (Usage) | Token 消耗/费用趋势图、按模型/供应商/智能体/渠道/日期聚合、Top 20 会话 |
+| 📈 **用量分析** (Usage) | 对齐 OpenClaw `sessions.usage` + `usage.cost` 双接口、Token/费用趋势图、按模型/供应商/智能体/渠道聚合、Top 20 会话、真实数据渲染上限保护 |
 | 🧩 **编排** (Orchestration) | 企业级编排控制面：Mission 发令、任务追踪、路径高亮、活策略面板、审批门禁、暂停/催办/重派、通道拓扑、组织架构 |
 | 📜 **日志** (Logs) | 实时日志流、级别/来源筛选、自动滚动、CSV 导出 |
 | ⚙️ **配置** (Setup) | 4 步配置向导：模式选择 → 网关地址与认证 → 连接测试 → 完成 |
@@ -39,7 +39,7 @@ OpenClaw Gateway 的配套运维可视化前端（纯前端 SPA）。通过 WebS
 3. 选择认证方式（Token 或 Password）→ 配置授权范围（scopes）
 4. 连接测试通过后自动切换为实时数据源
 
-实时模式下，所有页面通过 `GatewayClient` 发送 JSON-RPC 请求获取数据，并自动订阅 17 种网关事件实现实时更新。
+实时模式下，所有页面通过 `GatewayClient` 发送 JSON-RPC 请求获取数据，并自动订阅 17 种网关事件实现实时更新。`📈 用量分析` 页面会并行读取 `sessions.usage` 与 `usage.cost`，并兼容旧网关对 `mode` / `utcOffset` 参数的拒绝回退；`📡 渠道` 页面按 `channels.status` 的 schema-light 快照渲染，兼容插件扩展字段。
 
 ## 🚀 快速开始
 
@@ -197,7 +197,7 @@ claw-ops 使用的 OpenClaw JSON-RPC 方法（通过 WebSocket 调用）：
 |------|------|------|
 | 状态 | `health` `status` `system-presence` | 健康检查、系统快照、在线状态 |
 | 智能体 | `agents.list` `agents.create` `agents.update` `agents.delete` | 智能体 CRUD |
-| 会话 | `sessions.list` `sessions.patch` `sessions.reset` `sessions.delete` `sessions.usage` | 会话管理与用量 |
+| 会话 / 用量 | `sessions.list` `sessions.patch` `sessions.reset` `sessions.delete` `sessions.usage` `usage.cost` | 会话管理与用量分析 |
 | Chat | `chat.send` | 控制面催办 / 重派 / 主动干预 |
 | 渠道 | `channels.status` | 渠道连接状态 |
 | 定时 | `cron.list` `cron.add` `cron.update` `cron.remove` `cron.run` `cron.runs` | 定时任务管理 |

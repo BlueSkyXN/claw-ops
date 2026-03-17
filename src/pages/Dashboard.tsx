@@ -179,7 +179,10 @@ export default function Dashboard() {
       .sort((a, b) => b.totals.totalTokens - a.totals.totalTokens)
       .slice(0, 8)
       .map((entry) => ({
-        model: entry.model.length > 20 ? `${entry.model.slice(0, 18)}…` : entry.model,
+        model: (() => {
+          const label = entry.model ?? entry.provider ?? 'unknown'
+          return label.length > 20 ? `${label.slice(0, 18)}…` : label
+        })(),
         tokens: entry.totals.totalTokens,
         cost: entry.totals.totalCost,
         calls: entry.count,
@@ -346,7 +349,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-surface-border text-xs text-text-secondary">
             <span>总消耗: {runtime.usage.totals.totalTokens.toLocaleString()} tokens</span>
             <span>总费用: {formatCost(runtime.usage.totals.totalCost)}</span>
-            <span>API 调用: {runtime.usage.totals.calls.toLocaleString()} 次</span>
+            <span>总消息: {runtime.usage.aggregates.messages.total.toLocaleString()} 条</span>
           </div>
         )}
       </div>

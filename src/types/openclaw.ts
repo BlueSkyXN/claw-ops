@@ -374,6 +374,53 @@ export interface SessionsUsageParams {
   includeContextWeight?: boolean
 }
 
+export interface UsageCostParams {
+  startDate?: string
+  endDate?: string
+  days?: number
+  mode?: 'utc' | 'gateway' | 'specific'
+  utcOffset?: string
+}
+
+export interface SessionOriginInfo {
+  label?: string
+  provider?: string
+  surface?: string
+  chatType?: string
+  from?: string
+  to?: string
+  accountId?: string
+  threadId?: string | number
+}
+
+export interface SessionDailyUsage {
+  date: string
+  tokens: number
+  cost: number
+}
+
+export interface SessionDailyMessageCounts {
+  date: string
+  total: number
+  user: number
+  assistant: number
+  toolCalls: number
+  toolResults: number
+  errors: number
+}
+
+export interface SessionLatencyStats {
+  count: number
+  avgMs: number
+  p95Ms: number
+  minMs: number
+  maxMs: number
+}
+
+export interface SessionDailyLatency extends SessionLatencyStats {
+  date: string
+}
+
 export interface SessionUsageEntry {
   key: string
   label?: string
@@ -382,35 +429,102 @@ export interface SessionUsageEntry {
   agentId?: string
   channel?: string
   chatType?: string
+  origin?: SessionOriginInfo
+  modelOverride?: string
+  providerOverride?: string
   modelProvider?: string
   model?: string
-  usage: CostUsageSummary | null
+  usage: SessionCostSummary | null
+  contextWeight?: Record<string, unknown> | null
 }
 
-export interface CostUsageSummary {
+export interface SessionMessageCounts {
+  total: number
+  user?: number
+  assistant?: number
+  toolCalls?: number
+  toolResults?: number
+  errors?: number
+  inbound?: number
+  outbound?: number
+}
+
+export interface SessionToolUsage {
+  totalCalls: number
+  uniqueTools: number
+  tools: Array<{ name: string; count: number }>
+  calls?: number
+  errors?: number
+}
+
+export interface SessionModelUsage {
+  provider?: string | null
+  model?: string | null
+  count: number
   totals: UsageTotals
 }
 
+export interface SessionDailyModelUsage {
+  date: string
+  provider?: string | null
+  model?: string | null
+  tokens: number
+  cost: number
+  count: number
+}
+
+export interface SessionCostSummary extends UsageTotals {
+  totals?: UsageTotals | null
+  sessionId?: string
+  sessionFile?: string
+  firstActivity?: number
+  lastActivity?: number
+  durationMs?: number
+  activityDates?: string[]
+  dailyBreakdown?: SessionDailyUsage[]
+  dailyMessageCounts?: SessionDailyMessageCounts[]
+  dailyLatency?: SessionDailyLatency[]
+  dailyModelUsage?: SessionDailyModelUsage[]
+  messageCounts?: SessionMessageCounts
+  toolUsage?: SessionToolUsage
+  modelUsage?: SessionModelUsage[]
+  latency?: SessionLatencyStats
+}
+
+export type CostUsageSummary = SessionCostSummary
+
 export interface UsageTotals {
-  inputTokens: number
-  outputTokens: number
+  input?: number | null
+  output?: number | null
+  cacheRead?: number | null
+  cacheWrite?: number | null
   totalTokens: number
   totalCost: number
-  cacheReadTokens?: number
-  cacheWriteTokens?: number
-  reasoningTokens?: number
-  calls: number
-  errors: number
-  toolCalls?: number
+  inputCost?: number | null
+  outputCost?: number | null
+  cacheReadCost?: number | null
+  cacheWriteCost?: number | null
+  missingCostEntries?: number | null
+  inputTokens?: number | null
+  outputTokens?: number | null
+  cacheReadTokens?: number | null
+  cacheWriteTokens?: number | null
+  reasoningTokens?: number | null
+  calls?: number | null
+  errors?: number | null
+  toolCalls?: number | null
 }
 
 export interface SessionsUsageAggregates {
-  messages: { inbound: number; outbound: number; total: number }
-  tools: { calls: number; errors: number }
-  byModel: Array<{ model: string; count: number; totals: UsageTotals }>
-  byProvider: Array<{ provider: string; count: number; totals: UsageTotals }>
+  messages: SessionMessageCounts
+  tools: SessionToolUsage
+  byModel: SessionModelUsage[]
+  byProvider: SessionModelUsage[]
   byAgent: Array<{ agentId: string; totals: UsageTotals }>
   byChannel: Array<{ channel: string; totals: UsageTotals }>
+  latency?: SessionLatencyStats
+  dailyLatency?: SessionDailyLatency[]
+  modelDaily?: SessionDailyModelUsage[]
   daily: DailyUsage[]
 }
 
@@ -432,31 +546,60 @@ export interface SessionsUsageResult {
   aggregates: SessionsUsageAggregates
 }
 
+export interface UsageCostDailyEntry extends UsageTotals {
+  date: string
+}
+
+export interface UsageCostSummary {
+  updatedAt: number
+  days: number
+  daily: UsageCostDailyEntry[]
+  totals: UsageTotals
+}
+
 // ==========================================
 // Channel 类型
 // ==========================================
 
 export interface ChannelAccountSnapshot {
   accountId: string
-  name?: string
-  enabled?: boolean
-  configured?: boolean
-  linked?: boolean
-  running?: boolean
-  connected?: boolean
-  reconnectAttempts?: number
-  lastConnectedAt?: number
-  lastError?: string
-  lastStartAt?: number
-  lastStopAt?: number
-  lastInboundAt?: number
-  lastOutboundAt?: number
-  busy?: boolean
-  activeRuns?: number
-  lastRunActivityAt?: number
-  mode?: string
-  dmPolicy?: string
-  allowFrom?: string[]
+  name?: string | null
+  enabled?: boolean | null
+  configured?: boolean | null
+  linked?: boolean | null
+  running?: boolean | null
+  connected?: boolean | null
+  reconnectAttempts?: number | null
+  lastConnectedAt?: number | null
+  lastError?: string | null
+  lastStartAt?: number | null
+  lastStopAt?: number | null
+  lastInboundAt?: number | null
+  lastOutboundAt?: number | null
+  lastProbeAt?: number | null
+  busy?: boolean | null
+  activeRuns?: number | null
+  lastRunActivityAt?: number | null
+  mode?: string | null
+  dmPolicy?: string | null
+  allowFrom?: string[] | null
+  tokenSource?: string | null
+  botTokenSource?: string | null
+  appTokenSource?: string | null
+  credentialSource?: string | null
+  audienceType?: string | null
+  audience?: string | null
+  webhookPath?: string | null
+  webhookUrl?: string | null
+  baseUrl?: string | null
+  allowUnmentionedGroups?: boolean | null
+  cliPath?: string | null
+  dbPath?: string | null
+  port?: number | null
+  probe?: unknown
+  audit?: unknown
+  application?: unknown
+  [key: string]: unknown
 }
 
 export interface ChannelUiMeta {

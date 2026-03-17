@@ -18,10 +18,12 @@ import type {
   PresenceEntry,
   SessionsListResult,
   SessionsPatchParams,
+  UsageCostSummary,
   SessionsUsageResult,
   SkillEntry,
   Snapshot,
 } from '../types/openclaw'
+import { buildUsageCostSummary, getSessionUsageTotals } from '../lib/usage'
 import {
   mockAgents,
   mockChannelsStatus,
@@ -195,8 +197,8 @@ export function deriveUsageFromSessions(
       channel: session.channel,
       modelProvider: session.modelProvider,
       model: session.model,
-      usage: {
-        totals: {
+      usage: (() => {
+        const totals = {
           inputTokens,
           outputTokens,
           totalTokens,
@@ -204,20 +206,48 @@ export function deriveUsageFromSessions(
           calls,
           errors,
           toolCalls: Math.max(1, Math.round(calls * 0.4)),
-        },
-      },
+        }
+
+        return {
+          ...totals,
+          totals,
+          input: inputTokens,
+          output: outputTokens,
+          cacheRead: 0,
+          cacheWrite: 0,
+          inputCost: 0,
+          outputCost: totals.totalCost,
+          cacheReadCost: 0,
+          cacheWriteCost: 0,
+          missingCostEntries: 0,
+          reasoningTokens: Math.round(totalTokens * 0.12),
+        }
+      })(),
     }
-  })
+  }).map((entry) => ({
+    ...entry,
+    usage: {
+      ...(entry.usage ?? {}),
+      messageCounts: {
+        total: entry.usage?.calls ?? 0,
+        user: Math.max(1, Math.round((entry.usage?.calls ?? 0) * 0.48)),
+        assistant: Math.max(1, Math.round((entry.usage?.calls ?? 0) * 0.52)),
+        toolCalls: entry.usage?.toolCalls ?? 0,
+        toolResults: entry.usage?.toolCalls ?? 0,
+        errors: entry.usage?.errors ?? 0,
+      },
+    },
+  }))
 
   const totals = sessionUsageEntries.reduce((acc, entry) => {
-    const entryTotals = entry.usage?.totals
+    const entryTotals = getSessionUsageTotals(entry.usage)
     if (!entryTotals) return acc
-    acc.inputTokens += entryTotals.inputTokens
-    acc.outputTokens += entryTotals.outputTokens
+    acc.inputTokens += entryTotals.inputTokens ?? 0
+    acc.outputTokens += entryTotals.outputTokens ?? 0
     acc.totalTokens += entryTotals.totalTokens
     acc.totalCost += entryTotals.totalCost
-    acc.calls += entryTotals.calls
-    acc.errors += entryTotals.errors
+    acc.calls += entryTotals.calls ?? 0
+    acc.errors += entryTotals.errors ?? 0
     acc.toolCalls += entryTotals.toolCalls ?? 0
     return acc
   }, {
@@ -246,17 +276,17 @@ export function deriveUsageFromSessions(
   })
 
   const mergeTotals = (target: SessionsUsageResult['totals'], source: SessionsUsageResult['totals']) => {
-    target.inputTokens += source.inputTokens
-    target.outputTokens += source.outputTokens
+    target.inputTokens = (target.inputTokens ?? 0) + (source.inputTokens ?? 0)
+    target.outputTokens = (target.outputTokens ?? 0) + (source.outputTokens ?? 0)
     target.totalTokens += source.totalTokens
     target.totalCost += source.totalCost
-    target.calls += source.calls
-    target.errors += source.errors
+    target.calls = (target.calls ?? 0) + (source.calls ?? 0)
+    target.errors = (target.errors ?? 0) + (source.errors ?? 0)
     target.toolCalls = (target.toolCalls ?? 0) + (source.toolCalls ?? 0)
   }
 
   sessionUsageEntries.forEach((entry) => {
-    const usage = entry.usage?.totals
+    const usage = getSessionUsageTotals(entry.usage)
     if (!usage) return
 
     if (entry.model) {
@@ -292,7 +322,7 @@ export function deriveUsageFromSessions(
 
   const daily = previousDaily && previousDaily.length > 0
     ? previousDaily
-    : buildDailyUsage(totals.totalTokens, totals.totalCost, totals.calls)
+    : buildDailyUsage(totals.totalTokens, totals.totalCost, totals.calls ?? 0)
 
   return {
     updatedAt: Date.now(),
@@ -308,13 +338,27 @@ export function deriveUsageFromSessions(
     },
     aggregates: {
       messages: {
-        inbound: Math.max(0, Math.round(totals.calls * 0.48)),
-        outbound: Math.max(0, Math.round(totals.calls * 0.52)),
-        total: totals.calls,
+        total: totals.calls ?? 0,
+        user: Math.max(0, Math.round((totals.calls ?? 0) * 0.48)),
+        assistant: Math.max(0, Math.round((totals.calls ?? 0) * 0.52)),
+        inbound: Math.max(0, Math.round((totals.calls ?? 0) * 0.48)),
+        outbound: Math.max(0, Math.round((totals.calls ?? 0) * 0.52)),
+        toolCalls: totals.toolCalls ?? 0,
+        toolResults: totals.toolCalls ?? 0,
+        errors: totals.errors ?? 0,
       },
       tools: {
-        calls: totals.toolCalls,
-        errors: totals.errors,
+        totalCalls: totals.toolCalls ?? 0,
+        uniqueTools: (totals.toolCalls ?? 0) > 0 ? 3 : 0,
+        tools: (totals.toolCalls ?? 0) > 0
+          ? [
+              { name: 'search', count: Math.max(1, Math.round((totals.toolCalls ?? 0) * 0.45)) },
+              { name: 'read', count: Math.max(1, Math.round((totals.toolCalls ?? 0) * 0.35)) },
+              { name: 'write', count: Math.max(1, Math.round((totals.toolCalls ?? 0) * 0.2)) },
+            ]
+          : [],
+        calls: totals.toolCalls ?? 0,
+        errors: totals.errors ?? 0,
       },
       byModel: Array.from(byModel.entries()).map(([model, data]) => ({
         model,
@@ -518,6 +562,10 @@ export function getMockSessionsList(): SessionsListResult {
 
 export function getMockUsage(): SessionsUsageResult {
   return clone(ensureWorkspace().usage)
+}
+
+export function getMockUsageCost(): UsageCostSummary {
+  return buildUsageCostSummary(ensureWorkspace().usage)
 }
 
 export function getMockChannelsStatus(): ChannelsStatusResult {

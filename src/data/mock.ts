@@ -89,7 +89,7 @@ const totalTokens = dailyUsage.reduce((s, d) => s + d.tokens, 0)
 const totalCost = dailyUsage.reduce((s, d) => s + d.cost, 0)
 const totalMessages = dailyUsage.reduce((s, d) => s + d.messages, 0)
 
-const mockTotals: UsageTotals = {
+const mockTotals = {
   inputTokens: Math.floor(totalTokens * 0.38),
   outputTokens: Math.floor(totalTokens * 0.52),
   totalTokens,
@@ -100,11 +100,30 @@ const mockTotals: UsageTotals = {
   calls: totalMessages,
   errors: dailyUsage.reduce((s, d) => s + d.errors, 0),
   toolCalls: dailyUsage.reduce((s, d) => s + d.toolCalls, 0),
-}
+} satisfies UsageTotals
 
 const mockAggregates: SessionsUsageAggregates = {
-  messages: { inbound: Math.floor(totalMessages * 0.45), outbound: Math.floor(totalMessages * 0.55), total: totalMessages },
-  tools: { calls: mockTotals.toolCalls!, errors: mockTotals.errors },
+  messages: {
+    total: totalMessages,
+    user: Math.floor(totalMessages * 0.45),
+    assistant: Math.floor(totalMessages * 0.55),
+    inbound: Math.floor(totalMessages * 0.45),
+    outbound: Math.floor(totalMessages * 0.55),
+    toolCalls: mockTotals.toolCalls ?? 0,
+    toolResults: mockTotals.toolCalls ?? 0,
+    errors: mockTotals.errors ?? 0,
+  },
+  tools: {
+    totalCalls: mockTotals.toolCalls ?? 0,
+    uniqueTools: 3,
+    tools: [
+      { name: 'search', count: Math.max(1, Math.floor((mockTotals.toolCalls ?? 0) * 0.45)) },
+      { name: 'read', count: Math.max(1, Math.floor((mockTotals.toolCalls ?? 0) * 0.35)) },
+      { name: 'write', count: Math.max(1, Math.floor((mockTotals.toolCalls ?? 0) * 0.2)) },
+    ],
+    calls: mockTotals.toolCalls ?? 0,
+    errors: mockTotals.errors ?? 0,
+  },
   byModel: [
     { model: 'claude-sonnet-4-20250514', count: Math.floor(totalMessages * 0.55), totals: { ...mockTotals, totalTokens: Math.floor(totalTokens * 0.55), totalCost: +(totalCost * 0.55).toFixed(4), inputTokens: Math.floor(mockTotals.inputTokens * 0.55), outputTokens: Math.floor(mockTotals.outputTokens * 0.55), calls: Math.floor(totalMessages * 0.55), errors: 2, toolCalls: 45 } },
     { model: 'gpt-4o', count: Math.floor(totalMessages * 0.3), totals: { ...mockTotals, totalTokens: Math.floor(totalTokens * 0.3), totalCost: +(totalCost * 0.3).toFixed(4), inputTokens: Math.floor(mockTotals.inputTokens * 0.3), outputTokens: Math.floor(mockTotals.outputTokens * 0.3), calls: Math.floor(totalMessages * 0.3), errors: 1, toolCalls: 28 } },
@@ -137,7 +156,49 @@ export const mockUsage: SessionsUsageResult = {
     label: s.label,
     agentId: s.key.split('-').pop(),
     channel: s.channel,
-    usage: { totals: { inputTokens: s.inputTokens ?? 0, outputTokens: s.outputTokens ?? 0, totalTokens: s.totalTokens ?? 0, totalCost: +((s.totalTokens ?? 0) * 0.000015).toFixed(4), calls: 10 + Math.floor(Math.random() * 50), errors: 0 } },
+    usage: (() => {
+      const totalMessagesForSession = 10 + Math.floor(Math.random() * 50)
+      const totals = {
+        inputTokens: s.inputTokens ?? 0,
+        outputTokens: s.outputTokens ?? 0,
+        totalTokens: s.totalTokens ?? 0,
+        totalCost: +((s.totalTokens ?? 0) * 0.000015).toFixed(4),
+        calls: totalMessagesForSession,
+        errors: 0,
+      }
+      return {
+        ...totals,
+        totals,
+        input: totals.inputTokens,
+        output: totals.outputTokens,
+        cacheRead: 0,
+        cacheWrite: 0,
+        inputCost: 0,
+        outputCost: totals.totalCost,
+        cacheReadCost: 0,
+        cacheWriteCost: 0,
+        missingCostEntries: 0,
+        inputTokens: totals.inputTokens,
+        outputTokens: totals.outputTokens,
+        calls: totals.calls,
+        errors: totals.errors,
+        toolCalls: 2 + Math.floor(Math.random() * 8),
+        reasoningTokens: Math.floor((s.totalTokens ?? 0) * 0.08),
+      }
+    })(),
+  })).map((entry) => ({
+    ...entry,
+    usage: {
+      ...(entry.usage ?? {}),
+      messageCounts: {
+        total: entry.usage?.calls ?? 0,
+        user: Math.max(1, Math.round((entry.usage?.calls ?? 0) * 0.45)),
+        assistant: Math.max(1, Math.round((entry.usage?.calls ?? 0) * 0.55)),
+        toolCalls: entry.usage?.toolCalls ?? 0,
+        toolResults: entry.usage?.toolCalls ?? 0,
+        errors: 0,
+      },
+    },
   })),
   totals: mockTotals,
   aggregates: mockAggregates,

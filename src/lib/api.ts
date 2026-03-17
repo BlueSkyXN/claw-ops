@@ -9,6 +9,8 @@ import type {
   AgentsFileEntry,
   SessionsListParams,
   SessionsListResult,
+  UsageCostParams,
+  UsageCostSummary,
   SessionsUsageParams,
   SessionsUsageResult,
   ChannelsStatusResult,
@@ -37,6 +39,11 @@ import type {
 } from '../types/openclaw'
 import { GATEWAY_METHODS } from '../types/openclaw'
 import * as mockWorkspace from '../data/mock-workspace'
+import {
+  normalizeChannelsStatusResult,
+  normalizeSessionsUsageResult,
+  normalizeUsageCostSummary,
+} from './openclaw-normalizers'
 
 // ==========================================
 // 统一 API 接口
@@ -68,6 +75,7 @@ export interface DataAPI {
   resetSession(key: string): Promise<void>
   deleteSession(key: string): Promise<void>
   getSessionsUsage(params?: SessionsUsageParams): Promise<SessionsUsageResult>
+  getUsageCost(params?: UsageCostParams): Promise<UsageCostSummary>
 
   // Chat
   sendChatMessage(params: ChatSendParams): Promise<ChatMessage[]>
@@ -193,7 +201,13 @@ class GatewayAPI implements DataAPI {
   }
 
   async getSessionsUsage(params?: SessionsUsageParams) {
-    return this.request<SessionsUsageResult>(GATEWAY_METHODS.SESSIONS_USAGE, params)
+    const result = await this.request<SessionsUsageResult>(GATEWAY_METHODS.SESSIONS_USAGE, params)
+    return normalizeSessionsUsageResult(result)
+  }
+
+  async getUsageCost(params?: UsageCostParams) {
+    const result = await this.request<UsageCostSummary>(GATEWAY_METHODS.USAGE_COST, params)
+    return normalizeUsageCostSummary(result)
   }
 
   async sendChatMessage(params: ChatSendParams) {
@@ -201,7 +215,8 @@ class GatewayAPI implements DataAPI {
   }
 
   async getChannelsStatus() {
-    return this.request<ChannelsStatusResult>(GATEWAY_METHODS.CHANNELS_STATUS, { probe: false })
+    const result = await this.request<ChannelsStatusResult>(GATEWAY_METHODS.CHANNELS_STATUS, { probe: false })
+    return normalizeChannelsStatusResult(result)
   }
 
   async getCronJobs() {
@@ -364,9 +379,10 @@ const mockAPI: DataAPI = {
   async patchSession(params) { mockWorkspace.patchMockSession(params) },
   async resetSession(key) { mockWorkspace.resetMockSession(key) },
   async deleteSession(key) { mockWorkspace.deleteMockSession(key) },
-  async getSessionsUsage() { return mockWorkspace.getMockUsage() },
+  async getSessionsUsage() { return normalizeSessionsUsageResult(mockWorkspace.getMockUsage()) },
+  async getUsageCost() { return normalizeUsageCostSummary(mockWorkspace.getMockUsageCost()) },
   async sendChatMessage(params) { return mockWorkspace.sendMockChatMessage(params) },
-  async getChannelsStatus() { return mockWorkspace.getMockChannelsStatus() },
+  async getChannelsStatus() { return normalizeChannelsStatusResult(mockWorkspace.getMockChannelsStatus()) },
   async getCronJobs() { return mockWorkspace.getMockCronJobs() },
   async addCronJob() { return { id: 'new-cron' } },
   async updateCronJob() {},
