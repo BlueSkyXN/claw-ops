@@ -1,6 +1,6 @@
 import type { MockExperienceSummary } from '../data/mock-workspace'
 import type { ChatSendParams, LogEntry } from '../types/openclaw'
-import { getAPI } from './api'
+import { getAPI, isMissingScopeError } from './api'
 import { ensureGatewayClient } from './gateway-client'
 import {
   loadExperiencePreset,
@@ -74,6 +74,17 @@ async function safeLoadPreset(templateId: string | null): Promise<LoadedExperien
   }
 }
 
+async function safeGetExecApprovals(api: ReturnType<typeof getAPI>) {
+  try {
+    return await api.getExecApprovals()
+  } catch (err) {
+    if (isMissingScopeError(err, ['operator.admin', 'operator.approvals'])) {
+      return []
+    }
+    throw err
+  }
+}
+
 export async function loadOrchestrationRuntime(options?: { templateId?: string | null }): Promise<OrchestrationRuntime> {
   const api = getAPI()
   const [agents, sessionsResult, usage, channels, approvals, logs, nodes, config] = await Promise.all([
@@ -81,7 +92,7 @@ export async function loadOrchestrationRuntime(options?: { templateId?: string |
     api.getSessions({ limit: 200, includeGlobal: true, includeDerivedTitles: true, includeLastMessage: true }),
     api.getSessionsUsage(),
     api.getChannelsStatus(),
-    api.getExecApprovals(),
+    safeGetExecApprovals(api),
     api.getLogs({ limit: 200 }),
     api.getNodes(),
     api.getConfig(),

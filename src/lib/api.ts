@@ -45,6 +45,27 @@ import {
   normalizeUsageCostSummary,
 } from './openclaw-normalizers'
 
+function getAPIErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message
+  if (typeof err === 'string') return err
+  if (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') {
+    return err.message
+  }
+  return String(err)
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function isMissingScopeError(err: unknown, scopes?: string | string[]): boolean {
+  const message = getAPIErrorMessage(err)
+  if (!/missing scope:/i.test(message)) return false
+  if (!scopes) return true
+  const expected = Array.isArray(scopes) ? scopes : [scopes]
+  return expected.some((scope) => new RegExp(`missing scope:\\s*${escapeRegExp(scope)}`, 'i').test(message))
+}
+
 // ==========================================
 // 统一 API 接口
 // ==========================================
