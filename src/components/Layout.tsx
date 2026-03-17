@@ -2,7 +2,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { loadConfig, MODE_LABELS } from '../lib/config'
 import { getAPI } from '../lib/api'
-import { getGatewayClient } from '../lib/gateway-client'
+import { ensureGatewayClient, getGatewayClient } from '../lib/gateway-client'
 
 const navItems = [
   { path: '/', label: '总览', icon: '📊' },
@@ -39,6 +39,9 @@ export default function Layout() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [approvalCount, setApprovalCount] = useState(0)
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const gatewayConfigKey = config.mode === 'realtime'
+    ? `${config.gatewayUrl}|${config.authType}|${config.authToken}|${config.authPassword}|${config.scopes.join(',')}`
+    : 'mock'
 
   const loadApprovalCount = useCallback(async () => {
     try {
@@ -52,6 +55,10 @@ export default function Layout() {
   useEffect(() => {
     return () => { if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current) }
   }, [])
+
+  useEffect(() => {
+    ensureGatewayClient(config)
+  }, [gatewayConfigKey])
 
   const triggerRefresh = useCallback(() => {
     setIsRefreshing(true)
@@ -79,11 +86,12 @@ export default function Layout() {
   }, [autoRefresh, config.refreshInterval, triggerRefresh])
 
   useEffect(() => {
+    const currentConfig = loadConfig()
     void loadApprovalCount()
     const timer = setInterval(() => {
       void loadApprovalCount()
     }, 15000)
-    const client = getGatewayClient()
+    const client = ensureGatewayClient(currentConfig) ?? getGatewayClient()
     const unsubs = client
       ? [
           client.on('exec.approval.requested', () => { void loadApprovalCount() }),
@@ -95,7 +103,7 @@ export default function Layout() {
       clearInterval(timer)
       unsubs.forEach((unsubscribe) => unsubscribe())
     }
-  }, [loadApprovalCount])
+  }, [gatewayConfigKey, loadApprovalCount])
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface-bg">

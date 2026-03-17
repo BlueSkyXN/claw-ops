@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { loadConfig, saveConfig, type OpenClawConfig, type AppMode, MODE_LABELS } from '../lib/config'
-import { GatewayClient, type ConnectionState } from '../lib/gateway-client'
+import { GatewayClient, buildGatewayClientOptionsFromConfig, type ConnectionState } from '../lib/gateway-client'
 import type { Snapshot } from '../types/openclaw'
 
 type Step = 'mode' | 'gateway' | 'test' | 'done'
@@ -106,10 +106,7 @@ export default function Setup() {
     setSnapshot(null)
 
     const client = new GatewayClient({
-      url: config.gatewayUrl,
-      token: config.authType === 'token' ? config.authToken : undefined,
-      password: config.authType === 'password' ? config.authPassword : undefined,
-      scopes: config.scopes,
+      ...buildGatewayClientOptionsFromConfig(config),
       reconnect: false,
       onStateChange: (state) => {
         setConnState(state)

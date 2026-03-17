@@ -1,7 +1,7 @@
 import type { MockExperienceSummary } from '../data/mock-workspace'
 import type { ChatSendParams, LogEntry } from '../types/openclaw'
 import { getAPI } from './api'
-import { getGatewayClient } from './gateway-client'
+import { ensureGatewayClient } from './gateway-client'
 import {
   loadExperiencePreset,
   type LoadedExperiencePreset,
@@ -135,7 +135,7 @@ export async function loadOrchestrationRuntime(options?: { templateId?: string |
 }
 
 export function subscribeToOrchestrationEvents(onInvalidate: () => void): () => void {
-  const client = getGatewayClient()
+  const client = ensureGatewayClient()
   if (!client) return () => {}
 
   const events = [

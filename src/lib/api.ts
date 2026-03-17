@@ -2,7 +2,7 @@
 // 根据配置自动切换 Mock 数据 / OpenClaw Gateway WebSocket JSON-RPC
 
 import { loadConfig } from './config'
-import { getGatewayClient } from './gateway-client'
+import { ensureGatewayClientReady } from './gateway-client'
 import type {
   AgentSummary,
   AgentsListResult,
@@ -106,67 +106,72 @@ export interface DataAPI {
 // ==========================================
 
 class GatewayAPI implements DataAPI {
-  private get client() {
-    const c = getGatewayClient()
-    if (!c || !c.isConnected) throw new Error('Gateway not connected')
-    return c
+  private async getClient() {
+    return ensureGatewayClientReady(loadConfig())
+  }
+
+  private async request<T = unknown>(method: string, params?: object) {
+    const client = await this.getClient()
+    return client.request<T>(method, params)
   }
 
   async getHealth() {
-    const result = await this.client.request<{ ok: boolean }>(GATEWAY_METHODS.HEALTH)
-    return { ok: result?.ok ?? true, uptimeMs: this.client.currentSnapshot?.uptimeMs }
+    const client = await this.getClient()
+    const result = await client.request<{ ok: boolean }>(GATEWAY_METHODS.HEALTH)
+    return { ok: result?.ok ?? true, uptimeMs: client.currentSnapshot?.uptimeMs }
   }
 
   async getSnapshot() {
-    return this.client.currentSnapshot
+    const client = await this.getClient()
+    return client.currentSnapshot
   }
 
   async getPresence() {
-    const result = await this.client.request<PresenceEntry[]>(GATEWAY_METHODS.SYSTEM_PRESENCE)
+    const result = await this.request<PresenceEntry[]>(GATEWAY_METHODS.SYSTEM_PRESENCE)
     return result ?? []
   }
 
   async getAgents() {
-    const result = await this.client.request<AgentsListResult>(GATEWAY_METHODS.AGENTS_LIST)
+    const result = await this.request<AgentsListResult>(GATEWAY_METHODS.AGENTS_LIST)
     return result?.agents ?? []
   }
 
   async createAgent(params: AgentsCreateParams) {
-    return this.client.request<{ agentId: string }>(GATEWAY_METHODS.AGENTS_CREATE, params)
+    return this.request<{ agentId: string }>(GATEWAY_METHODS.AGENTS_CREATE, params)
   }
 
   async updateAgent(params: AgentsUpdateParams) {
-    await this.client.request(GATEWAY_METHODS.AGENTS_UPDATE, params)
+    await this.request(GATEWAY_METHODS.AGENTS_UPDATE, params)
   }
 
   async deleteAgent(params: AgentsDeleteParams) {
-    await this.client.request(GATEWAY_METHODS.AGENTS_DELETE, params)
+    await this.request(GATEWAY_METHODS.AGENTS_DELETE, params)
   }
 
   async agentFilesList(agentId: string) {
-    const result = await this.client.request<{ files: AgentsFileEntry[] }>(
+    const result = await this.request<{ files: AgentsFileEntry[] }>(
       GATEWAY_METHODS.AGENTS_FILES_LIST, { agentId }
     )
     return result?.files ?? []
   }
 
   async agentFilesGet(agentId: string, path: string) {
-    const result = await this.client.request<{ content: string }>(
+    const result = await this.request<{ content: string }>(
       GATEWAY_METHODS.AGENTS_FILES_GET, { agentId, path }
     )
     return result?.content ?? ''
   }
 
   async agentFilesSet(agentId: string, path: string, content: string) {
-    await this.client.request(GATEWAY_METHODS.AGENTS_FILES_SET, { agentId, path, content })
+    await this.request(GATEWAY_METHODS.AGENTS_FILES_SET, { agentId, path, content })
   }
 
   async installSkill(skillId: string) {
-    await this.client.request(GATEWAY_METHODS.SKILLS_INSTALL, { skillId })
+    await this.request(GATEWAY_METHODS.SKILLS_INSTALL, { skillId })
   }
 
   async getSessions(params?: SessionsListParams) {
-    const result = await this.client.request<SessionsListResult>(GATEWAY_METHODS.SESSIONS_LIST, {
+    const result = await this.request<SessionsListResult>(GATEWAY_METHODS.SESSIONS_LIST, {
       limit: 100,
       includeDerivedTitles: true,
       includeLastMessage: true,
@@ -176,57 +181,57 @@ class GatewayAPI implements DataAPI {
   }
 
   async patchSession(params: SessionsPatchParams) {
-    await this.client.request(GATEWAY_METHODS.SESSIONS_PATCH, params)
+    await this.request(GATEWAY_METHODS.SESSIONS_PATCH, params)
   }
 
   async resetSession(key: string) {
-    await this.client.request(GATEWAY_METHODS.SESSIONS_RESET, { key })
+    await this.request(GATEWAY_METHODS.SESSIONS_RESET, { key })
   }
 
   async deleteSession(key: string) {
-    await this.client.request(GATEWAY_METHODS.SESSIONS_DELETE, { key })
+    await this.request(GATEWAY_METHODS.SESSIONS_DELETE, { key })
   }
 
   async getSessionsUsage(params?: SessionsUsageParams) {
-    return this.client.request<SessionsUsageResult>(GATEWAY_METHODS.SESSIONS_USAGE, params)
+    return this.request<SessionsUsageResult>(GATEWAY_METHODS.SESSIONS_USAGE, params)
   }
 
   async sendChatMessage(params: ChatSendParams) {
-    return this.client.request<ChatMessage[]>(GATEWAY_METHODS.CHAT_SEND, params)
+    return this.request<ChatMessage[]>(GATEWAY_METHODS.CHAT_SEND, params)
   }
 
   async getChannelsStatus() {
-    return this.client.request<ChannelsStatusResult>(GATEWAY_METHODS.CHANNELS_STATUS, { probe: false })
+    return this.request<ChannelsStatusResult>(GATEWAY_METHODS.CHANNELS_STATUS, { probe: false })
   }
 
   async getCronJobs() {
-    const result = await this.client.request<{ jobs: CronJob[] }>(GATEWAY_METHODS.CRON_LIST)
+    const result = await this.request<{ jobs: CronJob[] }>(GATEWAY_METHODS.CRON_LIST)
     return result?.jobs ?? []
   }
 
   async addCronJob(params: CronAddParams) {
-    return this.client.request<{ id: string }>(GATEWAY_METHODS.CRON_ADD, params)
+    return this.request<{ id: string }>(GATEWAY_METHODS.CRON_ADD, params)
   }
 
   async updateCronJob(params: CronUpdateParams) {
-    await this.client.request(GATEWAY_METHODS.CRON_UPDATE, params)
+    await this.request(GATEWAY_METHODS.CRON_UPDATE, params)
   }
 
   async removeCronJob(params: CronRemoveParams) {
-    await this.client.request(GATEWAY_METHODS.CRON_REMOVE, params)
+    await this.request(GATEWAY_METHODS.CRON_REMOVE, params)
   }
 
   async runCronJob(params: CronRunParams) {
-    await this.client.request(GATEWAY_METHODS.CRON_RUN, params)
+    await this.request(GATEWAY_METHODS.CRON_RUN, params)
   }
 
   async getCronRuns(params: CronRunsParams) {
-    const result = await this.client.request<{ runs: CronRunLogEntry[] }>(GATEWAY_METHODS.CRON_RUNS, params)
+    const result = await this.request<{ runs: CronRunLogEntry[] }>(GATEWAY_METHODS.CRON_RUNS, params)
     return result?.runs ?? []
   }
 
   async getLogs(params?: LogsTailParams) {
-    const result = await this.client.request<LogsTailResult>(GATEWAY_METHODS.LOGS_TAIL, {
+    const result = await this.request<LogsTailResult>(GATEWAY_METHODS.LOGS_TAIL, {
       limit: 200,
       ...params,
     })
@@ -235,31 +240,31 @@ class GatewayAPI implements DataAPI {
   }
 
   async getModels() {
-    const result = await this.client.request<{ models: ModelChoice[] }>(GATEWAY_METHODS.MODELS_LIST)
+    const result = await this.request<{ models: ModelChoice[] }>(GATEWAY_METHODS.MODELS_LIST)
     return result?.models ?? []
   }
 
   async getSkills() {
-    const result = await this.client.request<{ skills: SkillEntry[] }>(GATEWAY_METHODS.SKILLS_STATUS)
+    const result = await this.request<{ skills: SkillEntry[] }>(GATEWAY_METHODS.SKILLS_STATUS)
     return result?.skills ?? []
   }
 
   async getNodes() {
-    const result = await this.client.request<{ nodes: NodeListNode[] }>(GATEWAY_METHODS.NODE_LIST)
+    const result = await this.request<{ nodes: NodeListNode[] }>(GATEWAY_METHODS.NODE_LIST)
     return result?.nodes ?? []
   }
 
   async getConfig() {
-    return this.client.request<Record<string, unknown>>(GATEWAY_METHODS.CONFIG_GET)
+    return this.request<Record<string, unknown>>(GATEWAY_METHODS.CONFIG_GET)
   }
 
   async getExecApprovals() {
-    const result = await this.client.request<{ requests: ExecApprovalRequest[] }>(GATEWAY_METHODS.EXEC_APPROVALS_GET)
+    const result = await this.request<{ requests: ExecApprovalRequest[] }>(GATEWAY_METHODS.EXEC_APPROVALS_GET)
     return result?.requests ?? []
   }
 
   async resolveExecApproval(requestId: string, decision: 'approved' | 'denied') {
-    await this.client.request(GATEWAY_METHODS.EXEC_APPROVAL_RESOLVE, { requestId, decision })
+    await this.request(GATEWAY_METHODS.EXEC_APPROVAL_RESOLVE, { requestId, decision })
   }
 }
 

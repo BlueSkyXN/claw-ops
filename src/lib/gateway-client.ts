@@ -13,6 +13,7 @@ import type {
   Snapshot,
   PresenceEntry,
 } from '../types/openclaw'
+import { loadConfig, type OpenClawConfig } from './config'
 
 const PROTOCOL_VERSION = 3
 const DEFAULT_GATEWAY_CLIENT_ID: GatewayClientId = 'openclaw-control-ui'
@@ -49,6 +50,7 @@ export class GatewayClient {
   private pendingRequests = new Map<string, PendingRequest>()
   private requestCounter = 0
   private snapshot: Snapshot | null = null
+  private lastError: Error | null = null
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private eventListeners = new Map<string, Set<(payload: unknown) => void>>()
   private intentionalClose = false
@@ -76,6 +78,10 @@ export class GatewayClient {
     return this.snapshot
   }
 
+  get lastConnectionError(): Error | null {
+    return this.lastError
+  }
+
   get isConnected(): boolean {
     return this.state === 'connected'
   }
@@ -87,6 +93,7 @@ export class GatewayClient {
     }
     this.intentionalClose = false
     this.challengeNonce = null
+    this.lastError = null
     this.setState('connecting')
 
     const wsUrl = this.normalizeUrl(this.options.url)
@@ -113,8 +120,9 @@ export class GatewayClient {
     }
 
     this.ws.onerror = () => {
+      this.lastError = new Error('WebSocket connection error')
       this.setState('error')
-      this.options.onError?.(new Error('WebSocket connection error'))
+      this.options.onError?.(this.lastError)
     }
 
     this.ws.onclose = () => {
@@ -247,13 +255,15 @@ export class GatewayClient {
         this.handleHelloOk(result as HelloOk)
       },
       reject: (error: Error) => {
+        this.lastError = error
         this.setState('error')
         this.options.onError?.(error)
       },
       timer: setTimeout(() => {
         this.pendingRequests.delete(id)
+        this.lastError = new Error('Connect handshake timeout')
         this.setState('error')
-        this.options.onError?.(new Error('Connect handshake timeout'))
+        this.options.onError?.(this.lastError)
       }, 15000),
     })
 
@@ -276,6 +286,7 @@ export class GatewayClient {
 
   private handleHelloOk(hello: HelloOk): void {
     this.snapshot = hello.snapshot
+    this.lastError = null
     this.setState('connected')
     this.options.onSnapshot?.(hello.snapshot)
   }
@@ -330,8 +341,9 @@ export class GatewayClient {
   }
 
   private handleProtocolError(frame: { error: ErrorShape }): void {
+    this.lastError = new Error(`Protocol error: ${frame.error.message}`)
     this.setState('error')
-    this.options.onError?.(new Error(`Protocol error: ${frame.error.message}`))
+    this.options.onError?.(this.lastError)
     this.disconnect()
   }
 
@@ -361,25 +373,116 @@ export class GatewayClient {
   }
 }
 
+function buildGatewayClientConfigKey(options: GatewayClientOptions): string {
+  return JSON.stringify({
+    url: options.url,
+    token: options.token ?? null,
+    password: options.password ?? null,
+    scopes: options.scopes ?? [],
+    clientName: options.clientName ?? DEFAULT_GATEWAY_CLIENT_ID,
+    clientDisplayName: options.clientDisplayName ?? null,
+    clientMode: options.clientMode ?? 'webchat',
+  })
+}
+
+function waitForGatewayClientConnection(client: GatewayClient, timeoutMs: number): Promise<GatewayClient> {
+  const startedAt = Date.now()
+
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      if (client.isConnected) {
+        resolve(client)
+        return
+      }
+
+      if (client.connectionState === 'error') {
+        reject(client.lastConnectionError ?? new Error('Gateway connection failed'))
+        return
+      }
+
+      if (client.connectionState === 'disconnected' && client.lastConnectionError) {
+        reject(client.lastConnectionError)
+        return
+      }
+
+      if (Date.now() - startedAt >= timeoutMs) {
+        reject(new Error('Gateway connection timeout'))
+        return
+      }
+
+      setTimeout(tick, 100)
+    }
+
+    tick()
+  })
+}
+
+export function buildGatewayClientOptionsFromConfig(config: OpenClawConfig): GatewayClientOptions {
+  return {
+    url: config.gatewayUrl,
+    token: config.authType === 'token' ? (config.authToken || undefined) : undefined,
+    password: config.authType === 'password' ? (config.authPassword || undefined) : undefined,
+    scopes: config.scopes,
+  }
+}
+
 // ==========================================
 // 全局单例管理
 // ==========================================
 
 let globalClient: GatewayClient | null = null
+let globalClientConfigKey: string | null = null
 
 export function getGatewayClient(): GatewayClient | null {
   return globalClient
 }
 
-export function setGatewayClient(client: GatewayClient | null): void {
+export function setGatewayClient(client: GatewayClient | null, configKey?: string): void {
   if (globalClient && globalClient !== client) {
     globalClient.disconnect()
   }
   globalClient = client
+  globalClientConfigKey = client ? (configKey ?? globalClientConfigKey) : null
 }
 
 export function createGatewayClient(options: GatewayClientOptions): GatewayClient {
   const client = new GatewayClient(options)
-  setGatewayClient(client)
+  setGatewayClient(client, buildGatewayClientConfigKey(options))
   return client
+}
+
+export function ensureGatewayClient(config: OpenClawConfig = loadConfig()): GatewayClient | null {
+  if (config.mode !== 'realtime' || config.useMockData) {
+    setGatewayClient(null)
+    return null
+  }
+
+  const options = buildGatewayClientOptionsFromConfig(config)
+  const configKey = buildGatewayClientConfigKey(options)
+
+  if (!globalClient || globalClientConfigKey !== configKey) {
+    const client = createGatewayClient(options)
+    client.connect()
+    return client
+  }
+
+  if (!globalClient.isConnected && globalClient.connectionState !== 'connecting') {
+    globalClient.connect()
+  }
+
+  return globalClient
+}
+
+export async function ensureGatewayClientReady(
+  config: OpenClawConfig = loadConfig(),
+  timeoutMs = 15000,
+): Promise<GatewayClient> {
+  const client = ensureGatewayClient(config)
+  if (!client) {
+    throw new Error('Gateway not configured')
+  }
+  if (client.isConnected) {
+    return client
+  }
+  return waitForGatewayClientConnection(client, timeoutMs)
 }
