@@ -207,7 +207,7 @@ function buildMissionDispatchMessage(input: MissionDispatchInput): string {
 }
 
 function buildMissionSessionKey(taskId: string, ownerRoleId: string): string {
-  return `sess-web-dispatch-${taskId}-${ownerRoleId}`
+  return `sess-api-dispatch-${taskId}-${ownerRoleId}`
 }
 
 function buildRerouteParams(task: TrackedTask, targetRoleId: string): ChatSendParams {
@@ -242,7 +242,8 @@ export async function dispatchMission(input: MissionDispatchInput): Promise<void
     sessionKey,
     text: buildMissionDispatchMessage(input),
     agentId: input.ownerRoleId,
-    channel: 'web',
+    channel: 'api',
+    to: input.ownerRoleId,
     metadata: buildOrchestrationSessionMetadata({
       orchestrationTaskId: taskId,
       orchestrationRootSessionKey: sessionKey,

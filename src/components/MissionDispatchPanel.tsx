@@ -51,6 +51,7 @@ export default function MissionDispatchPanel({
   onActivate?: (() => Promise<void> | void) | null
   onDispatch: (input: MissionDispatchInput) => Promise<void> | void
 }) {
+  const [dispatchFeedback, setDispatchFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
   const [form, setForm] = useState<MissionDispatchInput>({
     title: '',
     brief: '',
@@ -78,6 +79,7 @@ export default function MissionDispatchPanel({
   const canSubmit = form.title.trim() !== '' && form.brief.trim() !== '' && form.successCriteria.trim() !== '' && form.ownerRoleId !== '' && !busy && !requiresActivation
 
   const applyQuickStart = (quickStart: ExperienceQuickStart) => {
+    setDispatchFeedback(null)
     setForm({
       title: quickStart.title,
       brief: quickStart.prompt,
@@ -90,6 +92,7 @@ export default function MissionDispatchPanel({
   const handleDispatch = async () => {
     if (!canSubmit) return
     try {
+      setDispatchFeedback(null)
       await onDispatch({
         title: form.title.trim(),
         brief: form.brief.trim(),
@@ -97,6 +100,7 @@ export default function MissionDispatchPanel({
         ownerRoleId: form.ownerRoleId,
         priority: form.priority,
       })
+      setDispatchFeedback({ tone: 'success', message: 'Mission 已下达，正在等待任务与会话刷新。' })
       setForm((current) => ({
         ...current,
         title: '',
@@ -104,8 +108,11 @@ export default function MissionDispatchPanel({
         successCriteria: '',
         priority: 'high',
       }))
-    } catch {
-      // parent surfaces dispatch failure
+    } catch (error) {
+      setDispatchFeedback({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Mission 下达失败，请稍后重试。',
+      })
     }
   }
 
@@ -242,12 +249,22 @@ export default function MissionDispatchPanel({
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-secondary">
               <span className={`badge ${priority.badge}`}>{priority.label}</span>
               <span>{priority.hint}</span>
-              <span className="badge badge-cyan">统一入口 Web</span>
+              <span className="badge badge-cyan">控制面入口</span>
             </div>
             <button type="button" onClick={() => void handleDispatch()} className="btn-primary text-xs" disabled={!canSubmit}>
               {busy ? '正在下达...' : requiresActivation ? '先激活团队' : '🚀 下达 Mission'}
             </button>
           </div>
+
+          {dispatchFeedback && (
+            <div
+              className={`rounded-2xl border px-4 py-3 text-sm ${dispatchFeedback.tone === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-red-200 bg-red-50 text-red-700'}`}
+            >
+              {dispatchFeedback.message}
+            </div>
+          )}
         </div>
 
         <div className="space-y-3">
