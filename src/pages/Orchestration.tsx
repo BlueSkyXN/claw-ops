@@ -14,6 +14,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import dagre from 'dagre'
+import { NavLink, useLocation } from 'react-router-dom'
 import type { ChannelAccountSnapshot, ChannelsStatusResult } from '../types/openclaw'
 import { getAPI } from '../lib/api'
 import { loadConfig } from '../lib/config'
@@ -33,13 +34,16 @@ import type { PresetRoleDetail } from '../lib/presets'
 import ActiveTasksPanel, { type ActiveTaskPanelAction } from '../components/ActiveTasksPanel'
 import AgentLayerBadge from '../components/AgentLayerBadge'
 import MissionDispatchPanel from '../components/MissionDispatchPanel'
+import OperationsMonitorBoard from '../components/OperationsMonitorBoard'
 import OrchestratorHealthStrip from '../components/OrchestratorHealthStrip'
 import RoleOperatingPolicyPanel from '../components/RoleOperatingPolicyPanel'
+import TaskKanbanBoard from '../components/TaskKanbanBoard'
 import TaskActivityFeed from '../components/TaskActivityFeed'
 import TaskStepTimeline from '../components/TaskStepTimeline'
 import TeamPresetsPanel from '../components/TeamPresetsPanel'
 
 type ViewMode = 'graph' | 'channels' | 'org'
+type OrchestrationSection = 'overview' | 'tasks' | 'topology'
 type InteractionMode = 'read' | 'edit'
 type NodeTraceState = 'idle' | 'active' | 'completed' | 'waiting' | 'blocked'
 
@@ -83,6 +87,12 @@ const EMPTY_LOAD: RoleLoadInfo = {
   completedTasks: 0,
   failedTasks: 0,
   pendingApprovals: 0,
+}
+
+function resolveSection(pathname: string): OrchestrationSection {
+  if (pathname.startsWith('/orchestration/tasks')) return 'tasks'
+  if (pathname.startsWith('/orchestration/topology')) return 'topology'
+  return 'overview'
 }
 
 function applyLayout(nodes: Node[], edges: Edge[], direction: 'LR' | 'TB') {
@@ -772,6 +782,8 @@ function TaskControlCard({
 }
 
 export default function Orchestration() {
+  const location = useLocation()
+  const section = useMemo(() => resolveSection(location.pathname), [location.pathname])
   const [viewMode, setViewMode] = useState<ViewMode>('graph')
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('edit')
   const [focusMode, setFocusMode] = useState(false)
@@ -1009,6 +1021,7 @@ export default function Orchestration() {
       { label: '待审批', value: String(runtime.taskSummary.pendingApprovals) },
     ]
   }, [loadedExperience, runtime])
+  const overviewDetail: SelectedDetail | null = selectedDetail ?? (selectedPresetSummary ? { type: 'team', summary: selectedPresetSummary } : null)
 
   if (loading && !runtime) {
     return <div className="flex items-center justify-center h-80 text-text-secondary text-sm">加载编排控制面...</div>
@@ -1067,149 +1080,39 @@ export default function Orchestration() {
         </div>
       )}
 
-      <div className={`grid gap-6 items-start ${focusMode ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_380px]'}`}>
-        <div className="space-y-4 min-w-0">
-          <div className="card p-4 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <button onClick={() => setViewMode('graph')} className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${viewMode === 'graph' ? 'bg-brand-50 text-brand-600 font-semibold' : 'bg-surface-hover text-text-secondary hover:text-text-primary'}`}>
-                  🧩 执行图谱
-                </button>
-                <button onClick={() => setViewMode('channels')} className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${viewMode === 'channels' ? 'bg-brand-50 text-brand-600 font-semibold' : 'bg-surface-hover text-text-secondary hover:text-text-primary'}`}>
-                  🔗 入口拓扑
-                </button>
-                <button onClick={() => setViewMode('org')} className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${viewMode === 'org' ? 'bg-brand-50 text-brand-600 font-semibold' : 'bg-surface-hover text-text-secondary hover:text-text-primary'}`}>
-                  🏢 组织架构
-                </button>
-              </div>
-              <div className="text-xs text-text-secondary">
-                {viewMode === 'graph' && '高亮当前任务路径、门禁与交付归并'}
-                {viewMode === 'channels' && '查看任务如何从渠道进入组织网络'}
-                {viewMode === 'org' && '查看层级覆盖与角色负载'}
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-surface-border pt-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <button onClick={() => setInteractionMode('read')} className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${interactionMode === 'read' ? 'bg-brand-50 text-brand-600 font-semibold' : 'bg-surface-hover text-text-secondary hover:text-text-primary'}`}>
-                  🔒 浏览锁定
-                </button>
-                <button onClick={() => setInteractionMode('edit')} className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${interactionMode === 'edit' ? 'bg-brand-50 text-brand-600 font-semibold' : 'bg-surface-hover text-text-secondary hover:text-text-primary'}`}>
-                  ✍️ 布局拖动
-                </button>
-                <button onClick={() => setFocusMode((current) => !current)} className="btn-secondary text-xs">
-                  {focusMode ? '退出专注' : '专注阅读'}
-                </button>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button onClick={handleAutoLayout} className="btn-secondary text-xs">🔄 重新布局</button>
-                <button onClick={handleSaveLayout} className="btn-secondary text-xs" disabled={interactionMode !== 'edit'}>
-                  💾 保存布局
-                </button>
-                <button onClick={handleResetLayout} className="btn-secondary text-xs">↩︎ 重置布局</button>
-              </div>
-            </div>
-
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-secondary">
-                <span className="badge badge-blue">蓝色：当前执行路径</span>
-                <span className="badge badge-green">绿色：已完成</span>
-                <span className="badge badge-yellow">黄色：待审批 / 门禁</span>
-                <span className="badge badge-red">红色：阻断 / 失败</span>
-                <span className="badge badge-purple">{interactionMode === 'edit' ? '空白区平移 · 卡片直接拖动' : '空白区平移 · 卡片锁定防误触'}</span>
-              </div>
-            </div>
-
-          <div className={`card relative overflow-hidden ${focusMode ? 'h-[860px]' : 'h-[760px]'}`}>
-            {viewMode === 'graph' && loadedExperience && (
-              <div className="absolute inset-y-20 left-4 right-4 z-[1] grid grid-cols-4 gap-3 pointer-events-none opacity-60">
-                {(['L0', 'L1', 'L2', 'L3'] as const).map((layer) => {
-                  const tone = getRoleLayerTone(layer)
-                  return (
-                    <div key={layer} className={`rounded-3xl bg-gradient-to-b ${tone.card} border border-surface-border`} />
-                  )
-                })}
-              </div>
-            )}
-            {viewMode === 'graph' && loadedExperience && (
-              <div className="absolute left-4 right-4 top-4 z-10 grid grid-cols-4 gap-3 pointer-events-none">
-                {(['L0', 'L1', 'L2', 'L3'] as const).map((layer) => (
-                  <div key={layer} className="rounded-xl border border-surface-border bg-white/85 backdrop-blur px-3 py-2 text-[11px] text-text-secondary shadow-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <AgentLayerBadge layer={layer} />
-                      <span>{loadedExperience.summary.layerCounts[layer]} 角色</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              nodeTypes={nodeTypes}
-              fitView
-              fitViewOptions={{ padding: 0.22 }}
-              minZoom={0.2}
-              maxZoom={2}
-              panOnDrag
-              nodesDraggable={interactionMode === 'edit'}
-              selectionOnDrag={interactionMode === 'edit'}
-              zoomOnDoubleClick={interactionMode === 'edit'}
-              proOptions={{ hideAttribution: true }}
+      <div className="card p-3">
+        <div className="grid gap-3 lg:grid-cols-3">
+          {[
+            { id: 'overview', to: '/orchestration/overview', label: '🏛 编排总览', hint: 'Mission、团队激活与健康概览' },
+            { id: 'tasks', to: '/orchestration/tasks', label: '🧭 任务工作台', hint: '任务列表、干预动作与过程日志' },
+            { id: 'topology', to: '/orchestration/topology', label: '🕸️ 拓扑视图', hint: '执行图谱、入口拓扑与组织架构' },
+          ].map((item) => (
+            <NavLink
+              key={item.id}
+              to={item.to}
+              className={`rounded-2xl border px-4 py-3 transition-colors ${
+                section === item.id
+                  ? 'border-brand-200 bg-brand-50 text-brand-600'
+                  : 'border-surface-border bg-white text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+              }`}
             >
-              <Background color="#e2e8f0" gap={22} size={1} />
-              <Controls className="!bg-surface-card !border-surface-border !rounded-xl" />
-              <MiniMap
-                nodeStrokeWidth={3}
-                style={{ backgroundColor: '#ffffff' }}
-                nodeColor={(node) => {
-                  const data = node.data as Partial<RoleNodeData> & Partial<SummaryNodeData> & Partial<ChannelNodeData> | undefined
-                  if (data?.traceState === 'active') return '#3b82f6'
-                  if (data?.traceState === 'completed') return '#10b981'
-                  if (data?.traceState === 'waiting') return '#f59e0b'
-                  if (data?.traceState === 'blocked') return '#ef4444'
-                  if (node.id.startsWith('channel-')) return '#60a5fa'
-                  if (node.id.startsWith('quickstart-')) return '#c084fc'
-                  if (node.id === 'deliverable-node') return '#34d399'
-                  if (node.id.startsWith('role-')) return '#94a3b8'
-                  return '#cbd5e1'
-                }}
-              />
-            </ReactFlow>
-          </div>
-
-          {loadedExperience && (
-            <div className="grid grid-cols-3 gap-4">
-              {loadedExperience.summary.quickStarts.map((quickStart) => (
-                <button
-                  key={quickStart.id}
-                  type="button"
-                  onClick={() => setSelectedDetail({ type: 'quickstart', quickStart })}
-                  className="card-hover p-4 text-left space-y-3"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-text-primary">{quickStart.title}</p>
-                      <p className="text-[11px] text-text-secondary mt-1">{quickStart.user} · {quickStart.channel}</p>
-                    </div>
-                    <span className="text-2xl">{getChannelDisplay(quickStart.channel).emoji}</span>
-                  </div>
-                  <p className="text-xs text-text-muted leading-5">{quickStart.prompt}</p>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {focusMode && <DetailPanel detail={selectedDetail} />}
+              <p className="text-sm font-semibold">{item.label}</p>
+              <p className="mt-1 text-[11px] leading-5">{item.hint}</p>
+            </NavLink>
+          ))}
         </div>
+      </div>
 
-        {!focusMode && (
-          <div className="space-y-4 sticky top-6">
+      {section === 'overview' && (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] items-start">
+          <div className="space-y-4 min-w-0">
+            <OperationsMonitorBoard
+              taskSummary={runtime?.taskSummary ?? null}
+              health={runtime?.health ?? null}
+              usage={runtime?.usage ?? null}
+              channels={runtime?.channels ?? null}
+            />
             <MissionDispatchPanel
-              compact
               title="Mission 发令台"
               subtitle={activePreset ? `当前向 ${activePreset.summary.name} 下达目标与经营动作。` : '先激活团队，再向组织负责人发起 Mission。'}
               roles={activePreset?.roles ?? []}
@@ -1222,6 +1125,72 @@ export default function Orchestration() {
               onActivate={() => handleMissionActivation()}
               onDispatch={handleMissionDispatch}
             />
+
+            <TeamPresetsPanel
+              presets={presets}
+              selectedId={selectedTemplateId}
+              importingId={importingId}
+              onSelect={setSelectedTemplateId}
+              onImport={handleImport}
+            />
+
+            {loadedExperience && (
+              <div className="grid gap-4 md:grid-cols-3">
+                {loadedExperience.summary.quickStarts.map((quickStart) => (
+                  <button
+                    key={quickStart.id}
+                    type="button"
+                    onClick={() => setSelectedDetail({ type: 'quickstart', quickStart })}
+                    className="card-hover p-4 text-left space-y-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">{quickStart.title}</p>
+                        <p className="text-[11px] text-text-secondary mt-1">{quickStart.user} · {quickStart.channel}</p>
+                      </div>
+                      <span className="text-2xl">{getChannelDisplay(quickStart.channel).emoji}</span>
+                    </div>
+                    <p className="text-xs text-text-muted leading-5">{quickStart.prompt}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4 sticky top-6">
+            <div className="card p-5 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">运行态摘要</p>
+                  <p className="text-xs text-text-secondary mt-1">把发令、团队配置和当前运行态分开，避免在一个页面里同时读图、控任务、配模板。</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <NavLink to="/orchestration/tasks" className="btn-secondary text-xs">打开任务台</NavLink>
+                  <NavLink to="/orchestration/topology" className="btn-secondary text-xs">查看拓扑</NavLink>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {headerStats.map((stat) => (
+                  <div key={stat.label} className="rounded-2xl border border-surface-border bg-surface-bg px-4 py-3">
+                    <p className="text-[11px] text-text-secondary">{stat.label}</p>
+                    <p className="mt-1 text-lg font-semibold text-text-primary">{stat.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <DetailPanel detail={overviewDetail} />
+          </div>
+        </div>
+      )}
+
+      {section === 'tasks' && (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] items-start">
+          <div className="space-y-4 min-w-0">
+            <TaskKanbanBoard
+              tasks={runtime?.tasks ?? []}
+              selectedTaskId={selectedTaskId}
+              onSelectTask={(task) => setSelectedTaskId(task.id)}
+            />
             <ActiveTasksPanel
               title="运行态任务"
               subtitle={activePreset ? `当前控制面观测 ${activePreset.summary.name}` : '尚未激活运行中的企业编排团队'}
@@ -1231,26 +1200,169 @@ export default function Orchestration() {
               onAction={handleTaskAction}
               busyKey={actionBusyKey}
             />
-            <TaskControlCard task={selectedTask} activePreset={activePreset} busyKey={actionBusyKey} onAction={handleTaskAction} />
             <TaskActivityFeed
               tasks={runtime?.tasks ?? []}
               logs={runtime?.logs ?? []}
               selectedTask={selectedTask}
               title={selectedTask ? '选中任务过程与日志' : '任务动向与日志'}
-              subtitle={selectedTask ? '聚焦当前任务的阶段推进、门禁变化与相关日志。' : '优先看过程推进和日志，而不是渠道与成本。'}
-              maxItems={5}
+              subtitle={selectedTask ? '聚焦当前任务的阶段推进、门禁变化与相关日志。' : '将任务过程、审批门禁和实时信号收拢在一个工作台。'}
+              maxItems={8}
             />
-            <TeamPresetsPanel
-              presets={presets}
-              selectedId={selectedTemplateId}
-              importingId={importingId}
-              onSelect={setSelectedTemplateId}
-              onImport={handleImport}
-            />
-            <DetailPanel detail={selectedDetail} />
           </div>
-        )}
-      </div>
+
+          <div className="space-y-4 sticky top-6">
+            <TaskControlCard task={selectedTask} activePreset={activePreset} busyKey={actionBusyKey} onAction={handleTaskAction} />
+          </div>
+        </div>
+      )}
+
+      {section === 'topology' && (
+        <div className={`grid gap-6 items-start ${focusMode ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_380px]'}`}>
+          <div className="space-y-4 min-w-0">
+            <div className="card p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button onClick={() => setViewMode('graph')} className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${viewMode === 'graph' ? 'bg-brand-50 text-brand-600 font-semibold' : 'bg-surface-hover text-text-secondary hover:text-text-primary'}`}>
+                    🧩 执行图谱
+                  </button>
+                  <button onClick={() => setViewMode('channels')} className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${viewMode === 'channels' ? 'bg-brand-50 text-brand-600 font-semibold' : 'bg-surface-hover text-text-secondary hover:text-text-primary'}`}>
+                    🔗 入口拓扑
+                  </button>
+                  <button onClick={() => setViewMode('org')} className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${viewMode === 'org' ? 'bg-brand-50 text-brand-600 font-semibold' : 'bg-surface-hover text-text-secondary hover:text-text-primary'}`}>
+                    🏢 组织架构
+                  </button>
+                </div>
+                <div className="text-xs text-text-secondary">
+                  {viewMode === 'graph' && '高亮当前任务路径、门禁与交付归并'}
+                  {viewMode === 'channels' && '查看任务如何从渠道进入组织网络'}
+                  {viewMode === 'org' && '查看层级覆盖与角色负载'}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-surface-border pt-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button onClick={() => setInteractionMode('read')} className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${interactionMode === 'read' ? 'bg-brand-50 text-brand-600 font-semibold' : 'bg-surface-hover text-text-secondary hover:text-text-primary'}`}>
+                    🔒 浏览锁定
+                  </button>
+                  <button onClick={() => setInteractionMode('edit')} className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${interactionMode === 'edit' ? 'bg-brand-50 text-brand-600 font-semibold' : 'bg-surface-hover text-text-secondary hover:text-text-primary'}`}>
+                    ✍️ 布局拖动
+                  </button>
+                  <button onClick={() => setFocusMode((current) => !current)} className="btn-secondary text-xs">
+                    {focusMode ? '退出专注' : '专注阅读'}
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button onClick={handleAutoLayout} className="btn-secondary text-xs">🔄 重新布局</button>
+                  <button onClick={handleSaveLayout} className="btn-secondary text-xs" disabled={interactionMode !== 'edit'}>
+                    💾 保存布局
+                  </button>
+                  <button onClick={handleResetLayout} className="btn-secondary text-xs">↩︎ 重置布局</button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-secondary">
+                <span className="badge badge-blue">蓝色：当前执行路径</span>
+                <span className="badge badge-green">绿色：已完成</span>
+                <span className="badge badge-yellow">黄色：待审批 / 门禁</span>
+                <span className="badge badge-red">红色：阻断 / 失败</span>
+                <span className="badge badge-purple">{interactionMode === 'edit' ? '空白区平移 · 卡片直接拖动' : '空白区平移 · 卡片锁定防误触'}</span>
+              </div>
+            </div>
+
+            <div className={`card relative overflow-hidden ${focusMode ? 'h-[860px]' : 'h-[760px]'}`}>
+              {viewMode === 'graph' && loadedExperience && (
+                <div className="absolute inset-y-20 left-4 right-4 z-[1] grid grid-cols-4 gap-3 pointer-events-none opacity-60">
+                  {(['L0', 'L1', 'L2', 'L3'] as const).map((layer) => {
+                    const tone = getRoleLayerTone(layer)
+                    return (
+                      <div key={layer} className={`rounded-3xl bg-gradient-to-b ${tone.card} border border-surface-border`} />
+                    )
+                  })}
+                </div>
+              )}
+              {viewMode === 'graph' && loadedExperience && (
+                <div className="absolute left-4 right-4 top-4 z-10 grid grid-cols-4 gap-3 pointer-events-none">
+                  {(['L0', 'L1', 'L2', 'L3'] as const).map((layer) => (
+                    <div key={layer} className="rounded-xl border border-surface-border bg-white/85 backdrop-blur px-3 py-2 text-[11px] text-text-secondary shadow-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <AgentLayerBadge layer={layer} />
+                        <span>{loadedExperience.summary.layerCounts[layer]} 角色</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                nodeTypes={nodeTypes}
+                fitView
+                fitViewOptions={{ padding: 0.22 }}
+                minZoom={0.2}
+                maxZoom={2}
+                panOnDrag
+                nodesDraggable={interactionMode === 'edit'}
+                selectionOnDrag={interactionMode === 'edit'}
+                zoomOnDoubleClick={interactionMode === 'edit'}
+                proOptions={{ hideAttribution: true }}
+              >
+                <Background color="#e2e8f0" gap={22} size={1} />
+                <Controls className="!bg-surface-card !border-surface-border !rounded-xl" />
+                <MiniMap
+                  nodeStrokeWidth={3}
+                  style={{ backgroundColor: '#ffffff' }}
+                  nodeColor={(node) => {
+                    const data = node.data as Partial<RoleNodeData> & Partial<SummaryNodeData> & Partial<ChannelNodeData> | undefined
+                    if (data?.traceState === 'active') return '#3b82f6'
+                    if (data?.traceState === 'completed') return '#10b981'
+                    if (data?.traceState === 'waiting') return '#f59e0b'
+                    if (data?.traceState === 'blocked') return '#ef4444'
+                    if (node.id.startsWith('channel-')) return '#60a5fa'
+                    if (node.id.startsWith('quickstart-')) return '#c084fc'
+                    if (node.id === 'deliverable-node') return '#34d399'
+                    if (node.id.startsWith('role-')) return '#94a3b8'
+                    return '#cbd5e1'
+                  }}
+                />
+              </ReactFlow>
+            </div>
+
+            {loadedExperience && (
+              <div className="grid gap-4 md:grid-cols-3">
+                {loadedExperience.summary.quickStarts.map((quickStart) => (
+                  <button
+                    key={quickStart.id}
+                    type="button"
+                    onClick={() => setSelectedDetail({ type: 'quickstart', quickStart })}
+                    className="card-hover p-4 text-left space-y-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">{quickStart.title}</p>
+                        <p className="text-[11px] text-text-secondary mt-1">{quickStart.user} · {quickStart.channel}</p>
+                      </div>
+                      <span className="text-2xl">{getChannelDisplay(quickStart.channel).emoji}</span>
+                    </div>
+                    <p className="text-xs text-text-muted leading-5">{quickStart.prompt}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {focusMode && <DetailPanel detail={selectedDetail} />}
+          </div>
+
+          {!focusMode && (
+            <div className="space-y-4 sticky top-6">
+              <DetailPanel detail={selectedDetail} />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

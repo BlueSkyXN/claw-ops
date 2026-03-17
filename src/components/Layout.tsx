@@ -22,15 +22,19 @@ const pageTitles: Record<string, string> = {
   '/channels': '渠道状态',
   '/cron': '定时任务',
   '/usage': '用量分析',
-  '/orchestration': '编排视图',
-  '/topology': '编排视图',
+  '/orchestration': '编排总览',
+  '/orchestration/overview': '编排总览',
+  '/orchestration/tasks': '编排任务台',
+  '/orchestration/topology': '编排拓扑',
+  '/topology': '编排拓扑',
   '/logs': '运行日志',
 }
 
 export default function Layout() {
   const location = useLocation()
   const [refreshKey, setRefreshKey] = useState(0)
-  const title = pageTitles[location.pathname] || 'claw-ops'
+  const title = pageTitles[location.pathname]
+    || (location.pathname.startsWith('/orchestration') ? '编排视图' : 'claw-ops')
   const config = loadConfig()
   const modeInfo = MODE_LABELS[config.mode]
 

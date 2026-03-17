@@ -283,18 +283,18 @@ PAIRING_SCOPE = "operator.pairing"      // Device/node pairing
 ```typescript
 {
   sessionKey: string                    // Session identifier
-  text: string                          // Message text
+  message: string                       // Message text
+  idempotencyKey: string                // Client-generated dedupe key
   attachments?: ChatAttachment[]        // Uploaded files
-  agentId?: string
-  channel?: string
-  to?: string
-  model?: string                        // Override model
-  maxTokens?: number
   thinking?: boolean
-  parentId?: string                     // Reply to message ID
-  metadata?: Record<string, unknown>
+  deliver?: boolean
+  timeoutMs?: number
+  systemInputProvenance?: string
+  systemProvenanceReceipt?: string
 }
 ```
+
+> 注意：`chat.send` 当前 schema 为 `additionalProperties: false`。旧版 `text`、`agentId`、`channel`、`to`、`metadata` 等字段已经不再被 Gateway 接受。
 
 #### ChatMessage (Response Type)
 ```typescript
@@ -891,4 +891,3 @@ GATEWAY_CLIENT_CAPS = {
 
 **UI:**
 - `/ui/src/ui/navigation.ts` - Built-in UI tabs
-

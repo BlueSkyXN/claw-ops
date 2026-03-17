@@ -22,8 +22,8 @@ export default function App() {
         <Route path="/channels" element={<Channels />} />
         <Route path="/cron" element={<CronJobs />} />
         <Route path="/usage" element={<Usage />} />
-        <Route path="/orchestration" element={<Orchestration />} />
-        <Route path="/topology" element={<Navigate to="/orchestration" replace />} />
+        <Route path="/orchestration/*" element={<Orchestration />} />
+        <Route path="/topology" element={<Navigate to="/orchestration/topology" replace />} />
         <Route path="/logs" element={<Logs />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

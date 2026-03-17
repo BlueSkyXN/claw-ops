@@ -221,7 +221,8 @@ try {
   
   const result = await client.request('chat.send', {
     sessionKey: 'agent@session123',
-    text: 'Hello!'
+    message: 'Hello!',
+    idempotencyKey: 'chat-send-demo-001'
   });
   console.log('Chat result:', result);
 } catch (err) {
