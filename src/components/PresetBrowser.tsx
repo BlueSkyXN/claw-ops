@@ -1,9 +1,9 @@
 // 预设角色浏览器
-// 展示预设库中所有角色（按四层组织），支持查看详情与一键导入
+// 展示预设库中所有角色与团队模板，支持单角色导入与批量导入
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { loadManifest, loadRoleDetail, deployRole } from '../lib/presets'
-import type { PresetLibraryManifest, PresetLayer } from '../types/presets'
+import { loadManifest, loadRoleDetail, loadTeamTemplate, deployRole, deployTeam } from '../lib/presets'
+import type { PresetLibraryManifest, PresetLayer, PresetTeamTemplate } from '../types/presets'
 import type { PresetRoleDetail, DeployProgress } from '../lib/presets'
 
 // ==========================================
@@ -67,18 +67,70 @@ function RoleCard({
 }
 
 // ==========================================
+// 子组件: 团队模板卡片
+// ==========================================
+
+function TeamTemplateCard({
+  template,
+  featured,
+  busy,
+  onDeploy,
+}: {
+  template: PresetTeamTemplate
+  featured: boolean
+  busy: boolean
+  onDeploy: () => void
+}) {
+  return (
+    <div className={`rounded-2xl border p-4 transition-all ${featured ? 'border-brand-200 bg-brand-50/60 shadow-sm' : 'border-surface-border bg-surface-card hover:border-brand-100 hover:bg-surface-hover'}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-semibold text-text-primary">{template.name}</p>
+            {featured && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 border border-brand-200">
+                完整角色库
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-text-muted mt-1">{template.nameEn}</p>
+          <p className="text-xs text-text-secondary mt-2 leading-relaxed">{template.description}</p>
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            <span className="text-[10px] px-2 py-0.5 rounded-full border border-surface-border bg-surface-hover text-text-secondary">
+              {template.roles.length} 个角色
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full border border-surface-border bg-surface-hover text-text-secondary">
+              {template.workflow.length} 条协作链路
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={onDeploy}
+          disabled={busy}
+          className="btn-primary text-xs whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {busy ? '导入中...' : featured ? '🚀 一键导入' : '导入团队'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ==========================================
 // 子组件: 角色详情面板
 // ==========================================
 
 function RoleDetailPanel({
   detail,
   deploying,
+  deployDisabled,
   deployProgress,
   onDeploy,
   onClose,
 }: {
   detail: PresetRoleDetail
   deploying: boolean
+  deployDisabled: boolean
   deployProgress: DeployProgress | null
   onDeploy: () => void
   onClose: () => void
@@ -196,7 +248,11 @@ function RoleDetailPanel({
           ) : (
             <>
               <button onClick={onClose} className="btn-secondary text-xs">取消</button>
-              <button onClick={onDeploy} className="btn-primary text-xs flex items-center gap-1.5">
+              <button
+                onClick={onDeploy}
+                disabled={deployDisabled}
+                className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 🚀 一键导入到 OpenClaw
               </button>
             </>
@@ -213,6 +269,7 @@ function RoleDetailPanel({
 
 export default function PresetBrowser({ onImported }: { onImported: () => void }) {
   const [manifest, setManifest] = useState<PresetLibraryManifest | null>(null)
+  const [teamTemplates, setTeamTemplates] = useState<PresetTeamTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeLayer, setActiveLayer] = useState<PresetLayer | 'all'>('all')
@@ -225,7 +282,17 @@ export default function PresetBrowser({ onImported }: { onImported: () => void }
   // 部署状态
   const [deploying, setDeploying] = useState(false)
   const [deployProgress, setDeployProgress] = useState<DeployProgress | null>(null)
+  const [deployingTeamId, setDeployingTeamId] = useState<string | null>(null)
+  const [teamDeployProgress, setTeamDeployProgress] = useState<{
+    templateId: string
+    templateName: string
+    roleName: string
+    currentRole: number
+    totalRoles: number
+    step: DeployProgress
+  } | null>(null)
   const deployTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const anyDeploying = deploying || Boolean(deployingTeamId)
 
   // 清理定时器
   useEffect(() => {
@@ -234,16 +301,31 @@ export default function PresetBrowser({ onImported }: { onImported: () => void }
     }
   }, [])
 
-  // 加载清单
-  useEffect(() => {
-    loadManifest()
-      .then(setManifest)
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+  const loadPresetData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const nextManifest = await loadManifest()
+      const nextTeamTemplates = await Promise.all(
+        nextManifest.teamTemplates.map((template) => loadTeamTemplate(template.id)),
+      )
+      setManifest(nextManifest)
+      setTeamTemplates(nextTeamTemplates)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '加载失败')
+    } finally {
+      setLoading(false)
+    }
   }, [])
+
+  // 加载清单与团队模板
+  useEffect(() => {
+    void loadPresetData()
+  }, [loadPresetData])
 
   // 选中角色 → 加载详情
   const handleSelect = useCallback(async (roleId: string) => {
+    if (anyDeploying) return
     setSelectedRoleId(roleId)
     setLoadingDetail(true)
     try {
@@ -254,7 +336,7 @@ export default function PresetBrowser({ onImported }: { onImported: () => void }
     } finally {
       setLoadingDetail(false)
     }
-  }, [])
+  }, [anyDeploying])
 
   // 部署角色
   const handleDeploy = useCallback(async () => {
@@ -277,11 +359,45 @@ export default function PresetBrowser({ onImported }: { onImported: () => void }
     }
   }, [selectedRoleId, onImported])
 
+  // 批量部署团队/完整角色库
+  const handleDeployTeam = useCallback(async (templateId: string) => {
+    const template = teamTemplates.find((item) => item.id === templateId) ?? await loadTeamTemplate(templateId)
+    setDeployingTeamId(templateId)
+    setTeamDeployProgress(null)
+    try {
+      await deployTeam(templateId, (roleId, step) => {
+        const roleIndex = template.roles.indexOf(roleId)
+        const roleName = manifest?.roles.find((role) => role.id === roleId)?.name ?? roleId
+        setTeamDeployProgress({
+          templateId,
+          templateName: template.name,
+          roleName,
+          currentRole: roleIndex >= 0 ? roleIndex + 1 : 1,
+          totalRoles: template.roles.length,
+          step,
+        })
+      })
+
+      deployTimerRef.current = setTimeout(() => {
+        setDeployingTeamId(null)
+        setTeamDeployProgress(null)
+        setSelectedRoleId(null)
+        setRoleDetail(null)
+        setDeployProgress(null)
+        onImported()
+      }, 800)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '批量部署失败')
+      setDeployingTeamId(null)
+      setTeamDeployProgress(null)
+    }
+  }, [manifest, onImported, teamTemplates])
+
   const handleCloseDetail = useCallback(() => {
-    if (deploying) return
+    if (anyDeploying) return
     setSelectedRoleId(null)
     setRoleDetail(null)
-  }, [deploying])
+  }, [anyDeploying])
 
   if (loading) {
     return <div className="text-center text-text-muted text-sm py-12">加载预设库...</div>
@@ -291,7 +407,7 @@ export default function PresetBrowser({ onImported }: { onImported: () => void }
     return (
       <div className="text-center py-12">
         <p className="text-accent-red text-sm mb-2">⚠️ {error}</p>
-        <button onClick={() => { setError(null); setLoading(true); loadManifest().then(setManifest).catch(e => setError(e.message)).finally(() => setLoading(false)) }} className="btn-secondary text-xs">
+        <button onClick={() => void loadPresetData()} className="btn-secondary text-xs">
           重试
         </button>
       </div>
@@ -308,6 +424,11 @@ export default function PresetBrowser({ onImported }: { onImported: () => void }
   }, {} as Record<PresetLayer, typeof manifest.roles>)
 
   const visibleLayers = activeLayer === 'all' ? layers : [activeLayer]
+  const sortedTeamTemplates = [...teamTemplates].sort((left, right) => {
+    if (left.id === 'full-enterprise-command-center') return -1
+    if (right.id === 'full-enterprise-command-center') return 1
+    return left.name.localeCompare(right.name, 'zh-CN')
+  })
 
   return (
     <div className="space-y-4">
@@ -321,6 +442,53 @@ export default function PresetBrowser({ onImported }: { onImported: () => void }
           <p className="text-xs text-text-muted mt-0.5">{manifest.description}</p>
         </div>
       </div>
+
+      {/* 团队模板 / 一键导入完整角色库 */}
+      {sortedTeamTemplates.length > 0 && (
+        <div className="space-y-3">
+          <div>
+            <h5 className="text-xs font-semibold text-text-secondary mb-1">🏢 团队模板</h5>
+            <p className="text-xs text-text-muted">除了单个角色导入，现在也支持按团队模板批量部署；完整模板会一次性导入整套预设角色库。</p>
+          </div>
+
+          {teamDeployProgress && (
+            <div className="rounded-2xl border border-brand-200 bg-brand-50/60 p-4">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-text-primary truncate">{teamDeployProgress.templateName}</p>
+                  <p className="text-xs text-text-secondary mt-1">
+                    正在导入第 {teamDeployProgress.currentRole}/{teamDeployProgress.totalRoles} 个角色：{teamDeployProgress.roleName}
+                  </p>
+                </div>
+                <span className="text-[10px] text-text-muted whitespace-nowrap">
+                  {teamDeployProgress.step.current}/{teamDeployProgress.step.total}
+                </span>
+              </div>
+              <p className="text-xs text-text-secondary mb-2">{teamDeployProgress.step.label}</p>
+              <div className="w-full h-2 bg-surface-border rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-brand-500 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${((((teamDeployProgress.currentRole - 1) * teamDeployProgress.step.total) + teamDeployProgress.step.current) / (teamDeployProgress.totalRoles * teamDeployProgress.step.total)) * 100}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            {sortedTeamTemplates.map((template) => (
+              <TeamTemplateCard
+                key={template.id}
+                template={template}
+                featured={template.id === 'full-enterprise-command-center'}
+                busy={deployingTeamId === template.id}
+                onDeploy={() => void handleDeployTeam(template.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 层级筛选标签 */}
       <div className="flex gap-1.5">
@@ -386,6 +554,7 @@ export default function PresetBrowser({ onImported }: { onImported: () => void }
         <RoleDetailPanel
           detail={roleDetail}
           deploying={deploying}
+          deployDisabled={Boolean(deployingTeamId)}
           deployProgress={deployProgress}
           onDeploy={handleDeploy}
           onClose={handleCloseDetail}
