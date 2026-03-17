@@ -340,17 +340,32 @@ export interface ChatAttachment {
 
 export interface ChatSendParams {
   sessionKey: string
-  text: string
+  message: string
+  idempotencyKey: string
   attachments?: ChatAttachment[]
+  thinking?: string
+  deliver?: boolean
+  timeoutMs?: number
+  systemInputProvenance?: Record<string, unknown>
+  systemProvenanceReceipt?: string
+  // 以下字段是控制面在 mock / bridge 适配层使用的传输提示，
+  // Gateway 出口会在发送前剥离，仅保留官方 chat.send 支持的字段。
   agentId?: string
   channel?: string
   to?: string
   model?: string
   maxTokens?: number
-  thinking?: boolean
   parentId?: string
   metadata?: Record<string, unknown>
 }
+
+export type ChatSendResult =
+  | ChatMessage[]
+  | {
+      runId?: string
+      messageId?: string
+      channel?: string
+    }
 
 export interface ChatMessage {
   id: string

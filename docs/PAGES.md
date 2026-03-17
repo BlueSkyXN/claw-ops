@@ -9,11 +9,11 @@
 | 3 | 会话 | `/sessions` | 会话表格 + 筛选 + 详情 + 操作 | `sessions.list` `sessions.reset` `sessions.delete` |
 | 4 | 渠道 | `/channels` | 渠道连接状态 + 账户详情 | `channels.status` |
 | 5 | 定时任务 | `/cron` | Cron CRUD + 运行日志 + 手动触发 | `cron.list` `cron.add` `cron.update` `cron.remove` `cron.run` `cron.runs` |
-| 6 | 用量分析 | `/usage` | Token/费用趋势 + 多维聚合 | `sessions.usage` |
+| 6 | 用量分析 | `/usage` | Token/费用趋势 + 多维聚合 | `sessions.usage` `usage.cost` |
 | 7 | 编排控制面 | `/orchestration` | Mission 发令 + 任务追踪 + 路径高亮 + 活策略面板 + 审批门禁 + 干预动作 + 通道拓扑 + 组织架构 | `sessions.list` `sessions.patch` `sessions.reset` `sessions.usage` `channels.status` `logs.tail` `exec.approvals.get` `exec.approval.resolve` `chat.send` |
 | 8 | 拓扑 | `/topology` | 兼容旧入口，重定向到编排控制面 | — |
 | 9 | 日志 | `/logs` | 实时日志 + 筛选 + 导出 | `logs.tail` |
-| 10 | 配置 | `/setup` | 4 步配置向导 | `health`（连接测试） |
+| 10 | 配置 | `/setup` | 当前为 Demo / Realtime 4 步配置向导 | Gateway 握手 / Snapshot（连接测试） |
 
 ---
 
@@ -202,7 +202,7 @@
 
 ## 6. 用量分析 (Usage)
 
-**路径**：`/usage`  |  **文件**：`src/pages/Usage.tsx`  |  **数据**：`getSessionsUsage()`
+**路径**：`/usage`  |  **文件**：`src/pages/Usage.tsx`  |  **数据**：`getSessionsUsage()` `getUsageCost()`
 
 ### 功能模块
 
@@ -334,21 +334,21 @@
 ### 4 步流程
 
 #### Step 1: 运行模式
-- 三选一卡片：
-  - **独立开发 (standalone)**：纯前端 Mock 数据，无需后端
+- 当前为两选一卡片：
   - **Demo 演示 (demo)**：Mock 数据展示完整功能
   - **实时对接 (realtime)**：连接 OpenClaw Gateway
 - 各模式配有说明文字
+
+> 说明：`standalone` 仍作为历史环境变量 / 启动命令别名存在，但运行态会归一化到 `demo`。CLI / Hybrid 尚未进入实现态，设计规格见 [`docs/CLI-HYBRID-INTEGRATION.md`](./CLI-HYBRID-INTEGRATION.md)。
 
 #### Step 2: 网关配置（实时模式专属）
 - WebSocket 地址输入（默认 `ws://127.0.0.1:18789`）
 - 认证方式选择：Token / Password
 - 认证凭据输入
-- 授权范围（scopes）配置
 
 #### Step 3: 连接测试（实时模式专属）
 - WebSocket 握手测试（10 秒超时）
-- 尝试获取 Snapshot 验证连接
+- 通过握手后的 Snapshot 验证连接
 - 状态显示：测试中 / 成功（显示 uptime）/ 失败（显示错误）
 - 可跳过测试
 
@@ -369,8 +369,9 @@
 |------|------|------|
 | 侧边栏导航 | 左侧 | 8 项菜单 + 品牌标识 + 模式指示 |
 | 页面标题 | 顶栏 | 根据路径自动匹配 |
-| 连接状态 | 顶栏 | 实时模式显示 WebSocket 连接状态 |
+| 待审批徽章 | 顶栏 | 显示全局待审批数量 |
 | 手动刷新 | 顶栏 | 触发 `<Outlet key={refreshKey}/>` 重新挂载 |
+| 自动刷新 | 顶栏 | 可切换倒计时自动刷新 |
 
 #### 侧边栏菜单项
 
@@ -382,7 +383,7 @@
 | 📡 | 渠道 | `/channels` |
 | ⏰ | 定时任务 | `/cron` |
 | 📈 | 用量分析 | `/usage` |
-| 🔗 | 拓扑 | `/topology` |
+| 🧩 | 编排 | `/orchestration` |
 | 📜 | 日志 | `/logs` |
 
 ### CSV 导出

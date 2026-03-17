@@ -124,15 +124,29 @@ Page Component → loadOrchestrationRuntime() → DataAPI → GatewayAPI → Gat
 
 `GatewayAPI` 通过 `GatewayClient` 发送 JSON-RPC 请求。编排控制面额外依赖 `GatewayClient.on()` 监听 `agent` / `chat` / `exec.approval.*` / `session.update` / `agent.status` 等事件，以便在前端重算任务和路径状态。
 
+### 规划中的 CLI / Hybrid 扩展（未实现）
+
+当前仓库还没有 `CLIDataAPI` / `HybridAPI`，但 CLI / Hybrid 对接已经形成正式设计：未来推荐通过本地 bridge/backend 暴露受控能力，而不是让浏览器直接执行 `openclaw` CLI 或直接读取 `~/.openclaw`。
+
+```text
+Browser UI
+  ├─ demo      -> mockAPI
+  ├─ realtime  -> GatewayAPI -> OpenClaw Gateway
+  └─ hybrid    -> GatewayAPI + BridgeAPI -> local bridge -> CLI / filesystem / optional backend
+```
+
+正式设计规格见 [`docs/CLI-HYBRID-INTEGRATION.md`](./CLI-HYBRID-INTEGRATION.md)。
+
 ### WebSocket 连接流程
 
 ```
 1. new WebSocket(url)
-2. onopen → 发送 connect 帧（协议版本 + 客户端信息 + 认证凭据 + scopes）
-3. Gateway 返回 hello.ok（含 Snapshot: presence/health/uptimeMs）
-4. setState('connected')，缓存 Snapshot
-5. 之后通过 request() 发送 JSON-RPC 请求，通过 on() 监听事件
-6. 断线自动重连（可配置间隔，默认 3 秒）
+2. 等待 Gateway 发送 `connect.challenge` 事件
+3. 客户端发送 `type:'req'` / `method:'connect'` 的握手请求（协议版本 + client + auth + scopes）
+4. Gateway 以 `res` 帧返回 `hello.ok` payload（含 Snapshot: presence/health/uptimeMs）
+5. setState('connected')，缓存 Snapshot
+6. 之后继续通过 `request()` 发送 JSON-RPC 请求，通过 `on()` 监听事件
+7. 断线自动重连（可配置间隔，默认 3 秒）
 ```
 
 ### JSON-RPC 帧格式（OpenClaw 协议）
@@ -187,7 +201,7 @@ config.ts → localStorage['claw-ops-config'] → JSON
 
 ```typescript
 interface OpenClawConfig {
-  mode: 'standalone' | 'demo' | 'realtime'
+  mode: 'demo' | 'realtime'
   gatewayUrl: string               // WebSocket 地址，如 ws://127.0.0.1:18789
   authType: 'token' | 'password'
   authToken: string                // Token 认证凭据
@@ -201,6 +215,8 @@ interface OpenClawConfig {
 type GatewayScope = 'operator.read' | 'operator.write' | 'operator.admin'
                   | 'operator.approvals' | 'operator.pairing'
 ```
+
+> 说明：`standalone` 仍作为历史环境变量 / 旧配置别名保留，但在 `config.ts` 中会被归一化为 `demo`。CLI / Hybrid 的目标配置模型见 [`docs/CLI-HYBRID-INTEGRATION.md`](./CLI-HYBRID-INTEGRATION.md)。
 
 ## 路由表
 
@@ -218,18 +234,22 @@ type GatewayScope = 'operator.read' | 'operator.write' | 'operator.admin'
 | `/logs` | Logs | ✅ | 日志查看（筛选 + 自动滚动） |
 | `*` | — | — | 重定向到 `/` |
 
-## 三运行模式
+## 当前运行模式
 
 | 模式 | 环境变量 | 数据源 | 用途 |
 |------|----------|--------|------|
-| `standalone` | `VITE_APP_MODE=standalone` | Mock | 独立开发，无需 OpenClaw |
 | `demo` | `VITE_APP_MODE=demo` | Mock | 演示展示 |
 | `realtime` | — | WebSocket → OpenClaw Gateway | 生产使用 |
 
 模式选择优先级：
-1. 环境变量 `VITE_APP_MODE`
-2. localStorage 中已保存的配置
-3. 默认值 `standalone`
+1. 默认值 `demo`
+2. 若存在环境变量 `VITE_APP_MODE`，先覆盖默认值
+3. 若 localStorage 中存在已保存配置，再以保存配置覆盖前两者
+
+补充说明：
+
+- `VITE_APP_MODE=standalone` 仍会被兼容映射到 `demo`
+- `cli` / `hybrid` 目前还未进入实现态，只存在正式设计规格
 
 ## 事件订阅模型
 

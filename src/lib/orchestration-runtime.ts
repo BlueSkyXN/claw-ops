@@ -62,6 +62,14 @@ function slug(value: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
+function buildIdempotencyKey(seed: string): string {
+  const prefix = slug(seed) || 'chat-send'
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 export function isExperienceSummary(value: unknown): value is MockExperienceSummary {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Record<string, unknown>
@@ -217,7 +225,7 @@ function buildMissionDispatchMessage(input: MissionDispatchInput): string {
 }
 
 function buildMissionSessionKey(taskId: string, ownerRoleId: string): string {
-  return `sess-api-dispatch-${taskId}-${ownerRoleId}`
+  return `sess-web-dispatch-${taskId}-${ownerRoleId}`
 }
 
 function buildRerouteParams(task: TrackedTask, targetRoleId: string): ChatSendParams {
@@ -225,7 +233,9 @@ function buildRerouteParams(task: TrackedTask, targetRoleId: string): ChatSendPa
   const parentSessionKey = task.currentSessionKey ?? task.rootSessionKey
   return {
     sessionKey: `sess-api-${slug(task.id)}-${fromRoleId}-${targetRoleId}`,
-    text: buildControlMessage(task, 'reroute', targetRoleId),
+    message: buildControlMessage(task, 'reroute', targetRoleId),
+    idempotencyKey: buildIdempotencyKey(`${task.id}-reroute-${fromRoleId}-${targetRoleId}`),
+    deliver: false,
     agentId: targetRoleId,
     channel: 'api',
     to: targetRoleId,
@@ -250,7 +260,9 @@ export async function dispatchMission(input: MissionDispatchInput): Promise<void
   const sessionKey = buildMissionSessionKey(taskId, input.ownerRoleId)
   await api.sendChatMessage({
     sessionKey,
-    text: buildMissionDispatchMessage(input),
+    message: buildMissionDispatchMessage(input),
+    idempotencyKey: buildIdempotencyKey(taskId),
+    deliver: false,
     agentId: input.ownerRoleId,
     channel: 'api',
     to: input.ownerRoleId,
@@ -289,7 +301,9 @@ export async function performTaskIntervention(action: TaskInterventionAction): P
     case 'nudge': {
       const params: ChatSendParams = {
         sessionKey: action.task.currentSessionKey ?? action.task.rootSessionKey,
-        text: buildControlMessage(action.task, 'nudge'),
+        message: buildControlMessage(action.task, 'nudge'),
+        idempotencyKey: buildIdempotencyKey(`${action.task.id}-nudge`),
+        deliver: false,
         agentId: action.task.currentAgentId ?? action.task.ownerRoleId ?? undefined,
         metadata: buildOrchestrationSessionMetadata({
           orchestrationTaskId: action.task.id,

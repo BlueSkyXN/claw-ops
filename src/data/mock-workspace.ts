@@ -639,7 +639,7 @@ export function resolveMockExecApproval(requestId: string, decision: 'approved' 
 
 export function sendMockChatMessage(params: ChatSendParams): ChatMessage[] {
   const now = Date.now()
-  const tokenDelta = Math.max(900, Math.round(params.text.length * 42))
+  const tokenDelta = Math.max(900, Math.round(params.message.length * 42))
   let messages: ChatMessage[] = []
 
   commitWorkspace((workspace) => {
@@ -662,7 +662,7 @@ export function sendMockChatMessage(params: ChatSendParams): ChatMessage[] {
           sendPolicy: 'allow',
           channel: params.channel ?? existingSession.channel ?? 'api',
           model: params.model ?? existingSession.model,
-          lastMessagePreview: params.text,
+          lastMessagePreview: params.message,
           totalTokens: (existingSession.totalTokens ?? 0) + tokenDelta,
           inputTokens: (existingSession.inputTokens ?? 0) + Math.round(tokenDelta * 0.45),
           outputTokens: (existingSession.outputTokens ?? 0) + Math.round(tokenDelta * 0.55),
@@ -687,7 +687,7 @@ export function sendMockChatMessage(params: ChatSendParams): ChatMessage[] {
           outputTokens: Math.round(tokenDelta * 0.55),
           model: params.model,
           modelProvider: 'anthropic',
-          lastMessagePreview: params.text,
+          lastMessagePreview: params.message,
           sendPolicy: 'allow',
           responseUsage: 'tokens',
           contextTokens: 200000,
@@ -718,7 +718,7 @@ export function sendMockChatMessage(params: ChatSendParams): ChatMessage[] {
     ].slice(0, 200)
 
     messages = [
-      { id: `msg-${now}`, role: 'user', text: params.text, timestamp: now },
+      { id: `msg-${now}`, role: 'user', text: params.message, timestamp: now },
       { id: `msg-${now + 1}`, role: 'assistant', text: `控制消息已投递给 ${targetAgentId}`, timestamp: now + 800 },
     ]
   })

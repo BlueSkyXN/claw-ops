@@ -23,6 +23,7 @@ import type {
   CronRunParams,
   CronRunsParams,
   ChatSendParams,
+  ChatSendResult,
   ChatMessage,
   LogEntry,
   LogsTailParams,
@@ -121,6 +122,34 @@ function filterSessionsForUsage(sessions: SessionsListResult['sessions'], params
   })
 }
 
+function normalizeGatewayChatSendParams(params: ChatSendParams): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries({
+      sessionKey: params.sessionKey,
+      message: params.message,
+      thinking: params.thinking,
+      deliver: params.deliver,
+      attachments: params.attachments?.length ? params.attachments : undefined,
+      timeoutMs: params.timeoutMs,
+      systemInputProvenance: params.systemInputProvenance,
+      systemProvenanceReceipt: params.systemProvenanceReceipt,
+      idempotencyKey: params.idempotencyKey,
+    }).filter(([, value]) => value != null),
+  )
+}
+
+function normalizeBridgeChatSendParams(params: ChatSendParams): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries({
+      sessionKey: params.sessionKey,
+      text: params.message,
+      agentId: params.agentId,
+      thinking: params.thinking,
+      metadata: params.metadata,
+    }).filter(([, value]) => value != null),
+  )
+}
+
 // ==========================================
 // 统一 API 接口
 // ==========================================
@@ -154,7 +183,7 @@ export interface DataAPI {
   getUsageCost(params?: UsageCostParams): Promise<UsageCostSummary>
 
   // Chat
-  sendChatMessage(params: ChatSendParams): Promise<ChatMessage[]>
+  sendChatMessage(params: ChatSendParams): Promise<ChatSendResult>
 
   // Channels
   getChannelsStatus(): Promise<ChannelsStatusResult>
@@ -299,7 +328,7 @@ class GatewayAPI implements DataAPI {
   }
 
   async sendChatMessage(params: ChatSendParams) {
-    return this.request<ChatMessage[]>(GATEWAY_METHODS.CHAT_SEND, params)
+    return this.request<ChatSendResult>(GATEWAY_METHODS.CHAT_SEND, normalizeGatewayChatSendParams(params))
   }
 
   async getChannelsStatus() {
@@ -471,7 +500,7 @@ class BridgeAPI implements DataAPI {
   }
 
   async sendChatMessage(params: ChatSendParams) {
-    return this.request<ChatMessage[]>('sendChatMessage', params)
+    return this.request<ChatSendResult>('sendChatMessage', normalizeBridgeChatSendParams(params))
   }
 
   async getChannelsStatus() {
