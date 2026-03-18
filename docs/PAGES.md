@@ -1,394 +1,397 @@
-# claw-ops — 页面功能文档
+# claw-ops — 页面与路由文档
 
-## 页面一览
+> 本文档以 `src/App.tsx`、`src/components/Layout.tsx` 和各页面组件当前实现为准。
 
-| 序号 | 页面 | 路径 | 核心功能 | 数据来源 (JSON-RPC) |
-|------|------|------|----------|---------------------|
-| 1 | 总览 | `/` | CEO 发令台 + KPI + 编排健康条 + 经营绩效板 + 任务控制面 + 趋势图 + 最近会话 | `agents.list` `sessions.list` `sessions.usage` `channels.status` `logs.tail` `exec.approvals.get` `chat.send` |
-| 2 | 智能体 | `/agents` | 智能体卡片 + 创建/删除 | `agents.list` `agents.create` `agents.delete` |
-| 3 | 会话 | `/sessions` | 会话表格 + 筛选 + 详情 + 操作 | `sessions.list` `sessions.reset` `sessions.delete` |
-| 4 | 渠道 | `/channels` | 渠道连接状态 + 账户详情 | `channels.status` |
-| 5 | 定时任务 | `/cron` | Cron CRUD + 运行日志 + 手动触发 | `cron.list` `cron.add` `cron.update` `cron.remove` `cron.run` `cron.runs` |
-| 6 | 用量分析 | `/usage` | Token/费用趋势 + 多维聚合 | `sessions.usage` `usage.cost` |
-| 7 | 编排控制面 | `/orchestration` | Mission 发令 + 任务追踪 + 路径高亮 + 活策略面板 + 审批门禁 + 干预动作 + 通道拓扑 + 组织架构 | `sessions.list` `sessions.patch` `sessions.reset` `sessions.usage` `channels.status` `logs.tail` `exec.approvals.get` `exec.approval.resolve` `chat.send` |
-| 8 | 拓扑 | `/topology` | 兼容旧入口，重定向到编排控制面 | — |
-| 9 | 日志 | `/logs` | 实时日志 + 筛选 + 导出 | `logs.tail` |
-| 10 | 配置 | `/setup` | 当前为 Demo / Realtime 4 步配置向导 | Gateway 握手 / Snapshot（连接测试） |
+## 1. 路由总览
 
----
+| 路径 | 页面 | 文件 | 说明 |
+|---|---|---|---|
+| `/setup` | 配置向导 | `src/pages/Setup.tsx` | 独立页面，不使用 `Layout` |
+| `/` | 总览 | `src/pages/Dashboard.tsx` | 经营概览 + Mission 发令 + 任务监控 |
+| `/agents` | 智能体 | `src/pages/Agents.tsx` | 智能体列表 + 预设角色库 |
+| `/sessions` | 会话 | `src/pages/Sessions.tsx` | 会话列表与详情 |
+| `/channels` | 渠道 | `src/pages/Channels.tsx` | 渠道 / 账号状态 |
+| `/cron` | 定时任务 | `src/pages/CronJobs.tsx` | 定时任务 CRUD |
+| `/usage` | 用量分析 | `src/pages/Usage.tsx` | 用量与成本统计 |
+| `/orchestration/*` | 编排控制面 | `src/pages/Orchestration.tsx` | 内部分为 overview / tasks / topology |
+| `/topology` | 兼容入口 | `src/App.tsx` | 重定向到 `/orchestration/topology` |
+| `/logs` | 日志 | `src/pages/Logs.tsx` | 日志过滤 / 导出 |
 
-## 1. 总览 (Dashboard)
+> 仓库里仍有 `src/pages/Topology.tsx`，但当前 `App.tsx` 不再直接路由到它。运行时入口是 `/orchestration/topology`。
 
-**路径**：`/`  |  **文件**：`src/pages/Dashboard.tsx`  |  **数据**：`loadOrchestrationRuntime()`（内部使用 `getAgents()` `getSessions()` `getSessionsUsage()` `getChannelsStatus()` `getLogs()` `getExecApprovals()`）
+## 2. Layout 共享能力
 
-### 功能模块
+除 `/setup` 外，所有主页面都运行在 `src/components/Layout.tsx` 中。
 
-#### KPI 指标卡（4 项）
-- 活跃任务数
-- 治理压力（待审批 + 阻断）
-- 任务动向（最近 1 小时有动作）
-- 交付风险（停滞 + 失败）
-
-#### 编排健康条
-- 显示编排健康分、层级覆盖、吞吐、瓶颈和成本建议
-- 直接链接到 `/orchestration`
-
-#### CEO 发令台
-- 主动填写 Mission 标题、目标简报、成功标准、负责人、优先级
-- 通过 `chat.send` 将目标从统一控制面入口直接投递给组织负责人
-- 复用 quick start 场景快速起草经营动作
+### 2.1 侧边栏菜单
 
-#### 任务动向与日志
-- 优先展示任务推进、门禁变化和关键日志
-- 选中任务后自动聚焦相关步骤与日志
+| 标签 | 路径 |
+|---|---|
+| 总览 | `/` |
+| 智能体 | `/agents` |
+| 会话 | `/sessions` |
+| 渠道 | `/channels` |
+| 定时任务 | `/cron` |
+| 用量分析 | `/usage` |
+| 编排 | `/orchestration` |
+| 日志 | `/logs` |
 
-#### 经营绩效板
-- 把运行态指标翻译为吞吐、治理压力、组织热点、交付风险
-- 展示热点角色榜与容量比，面向管理者而不是纯技术监控
+### 2.2 顶栏能力
 
-#### 运行态任务列表
-- 展示任务状态、当前负责角色、审批积压、token 消耗和步骤时间线
-- 支持内联动作：暂停/恢复、催办、重置、审批通过/驳回
+- 基于路径自动显示标题
+- 手动刷新：重新挂载当前 `<Outlet>`
+- 自动刷新：按配置的 `refreshInterval` 倒计时刷新
+- 全局审批数徽章：定期读取 `getExecApprovals()`，并监听
+  - `exec.approval.requested`
+  - `exec.approval.resolved`
 
-#### 14 天用量趋势图
-- 面积图：Token 消耗 + 费用趋势
-- X 轴日期，双 Y 轴
-- 使用 Recharts `AreaChart` 渲染
+### 2.3 模式显示
 
-#### 模型使用分布
-- 柱状图：按模型展示 Token 消耗分布
-- 使用 Recharts `BarChart` 渲染
+当前底部模式文案来自 `MODE_LABELS`：
 
-#### 最近会话列表
-- 按更新时间排序，显示最近 8 条
-- 显示：会话标签 + 渠道 + 智能体 + Token 用量 + 相对时间
-
-#### 智能体状态网格
-- 2 列网格布局
-- 每卡片显示：Emoji + 名称 + agentId + 模型 + 供应商
+- demo
+- realtime
+- cli
+- hybrid
 
-#### 错误与加载处理
-- Loading 骨架屏动画
-- Error 状态提示
+## 3. 总览页 `/`
 
----
+**文件**：`src/pages/Dashboard.tsx`
 
-## 2. 智能体管理 (Agents)
+### 当前模块
 
-**路径**：`/agents`  |  **文件**：`src/pages/Agents.tsx`  |  **数据**：`getAgents()` `createAgent()` `deleteAgent()`
+1. `QuickStartBanner`
+   - 仅当 `runtime.experience === null` 时显示
+   - 支持一键导入 `opc-super-assistant`
+   - “预览编排”跳转到 `/orchestration`
 
-### 功能模块
+2. KPI 卡片
+   - 活跃任务
+   - 治理压力
+   - 任务动向
+   - 交付风险
 
-#### 智能体卡片网格
-- 3 列网格布局
-- 每卡片显示：
-  - Emoji + 名称 + agentId
-  - 模型 + 模型供应商
-  - 工作区（workspace）
-  - 描述文字
-  - 删除按钮
+3. `OrchestratorHealthStrip`
+   - 显示编排健康分、缺失层、瓶颈与建议
 
-#### 创建智能体对话框
-- 输入字段：名称、工作区
-- 创建成功后自动刷新列表
-
-#### 删除智能体确认
-- 确认对话框显示智能体名称
-- 删除后自动刷新列表
-
----
-
-## 3. 会话管理 (Sessions)
-
-**路径**：`/sessions`  |  **文件**：`src/pages/Sessions.tsx`  |  **数据**：`getSessions()` `resetSession()` `deleteSession()`
-
-### 功能模块
-
-#### KPI 指标卡（4 项）
-- 总会话数
-- 私聊会话数 (direct)
-- 群聊会话数 (group)
-- 总 Token 用量
+4. `MissionDispatchPanel`
+   - 直接派发 Mission
+   - 通过 `dispatchMission()` 调用 `chat.send`
 
-#### 筛选栏
-- 渠道筛选：下拉菜单（telegram / discord / slack / feishu 等）
-- 类型筛选：direct / group / global
-- 文本搜索：匹配会话标签
+5. `ExecutivePerformanceBoard`
+   - 将用量 / 渠道 / 任务态翻译成经营视角指标
 
-#### 会话表格
-- 列：标签 | 渠道 | 类型 | 智能体 | 模型 | Token 数 | 更新时间 | 最后消息
-- 点击行打开详情面板
-- 渠道 Emoji 图标
-
-#### 会话详情面板
-- 类型（kind）
-- 渠道 + 模型 + 供应商
-- 发送策略（sendPolicy）
-- 绑定智能体
-- Token 用量
-- Thinking / Reasoning 级别
-- 上下文窗口大小
-- 元数据（metadata）
+6. `ActiveTasksPanel`
+   - 支持暂停 / 恢复、催办、重置、审批通过 / 驳回
 
-#### 会话操作
-- 重置会话（resetSession）
-- 删除会话（deleteSession）+ 确认对话框
+7. `TaskActivityFeed`
+   - 聚合任务过程与日志
 
----
+8. 14 天趋势图
+   - `AreaChart`
+   - 数据来自 `runtime.usage.aggregates.daily`
 
-## 4. 渠道状态 (Channels)
+9. 模型分布图
+   - `BarChart`
+   - 数据来自 `runtime.usage.aggregates.byModel`
 
-**路径**：`/channels`  |  **文件**：`src/pages/Channels.tsx`  |  **数据**：`getChannelsStatus()`
+10. 最近会话
+   - 最近 8 条
 
-### 功能模块
+### 数据来源
 
-#### KPI 指标卡（4 项）
-- 总渠道数
-- 总账户数
-- 已连接账户数
-- 错误数
+通过 `loadOrchestrationRuntime()` 聚合读取：
 
-#### 渠道卡片（2 列网格）
-- 每渠道一张可展开卡片
-- 卡片头部：渠道 Emoji + 标签 + 账户数
-- 整体连接状态指示器（绿=全连/黄=部分/红=断开）
+- `agents`
+- `sessions`
+- `sessions.usage`
+- `channels.status`
+- `logs.tail`
+- `exec.approvals.get`
+- `node.list`
+- `config.get`
 
-#### 账户详情（展开后）
-- 每账户行显示：
-  - 名称 + accountId
-  - 状态徽章（connected / running / offline / error）
-  - **4 态状态灯**：configured / linked / running / connected
-  - 最近活动时间：lastConnectedAt / lastInboundAt / lastOutboundAt
-  - 重连次数（reconnectAttempts）
-  - 错误信息
-  - 模式（mode）、DM 策略（dmPolicy）、允许来源（allowFrom）
+并通过 `subscribeToOrchestrationEvents()` 刷新。
 
-#### 交互
-- 点击渠道卡片展开/折叠账户详情
+## 4. 智能体页 `/agents`
 
----
+**文件**：`src/pages/Agents.tsx`
 
-## 5. 定时任务 (CronJobs)
+### 当前结构
 
-**路径**：`/cron`  |  **文件**：`src/pages/CronJobs.tsx`  |  **数据**：`getCronJobs()` `addCronJob()` `updateCronJob()` `removeCronJob()` `runCronJob()` `getCronRuns()`
+顶部为双标签：
 
-### 功能模块
+- `🤖 智能体`
+- `📦 预设角色库`
 
-#### 任务列表
-- 每条显示：名称 + 描述 + 调度类型 + 启用状态 + 下次运行 + 上次运行
-- 调度类型展示：
-  - `at`：每日定时（如 09:00）
-  - `every`：间隔执行（如 30m）
-  - `cron`：Cron 表达式
-- 负载类型：
-  - `agentTurn`：发送消息给智能体
-  - `systemEvent`：触发系统事件
+### 智能体标签
 
-#### 新增任务对话框
-- 字段：名称、描述、调度类型、调度详情、负载类型、消息内容、智能体选择
+- 三列卡片网格
+- 每卡显示：
+  - emoji
+  - 名称
+  - `agent.id`
+  - identity theme（如存在）
+- 支持删除
+- 顶部支持空白创建
 
-#### 任务操作
-- 编辑（updateCronJob）
-- 删除（removeCronJob）
-- 手动运行（runCronJob）
+### 预设角色库标签
 
-#### 运行日志
-- 显示最近运行记录
-- 状态徽章：success（绿）/ error（红）/ skipped（黄）
-- 运行时长格式化
-- 投递状态（delivered / not-delivered / unknown）
+- 由 `PresetBrowser` 承载
+- 支持浏览角色详情与导入
 
----
+> 当前 `Agents` 页没有“团队”独立标签；若其他设计稿提到该标签，属于规划而非当前实现。
 
-## 6. 用量分析 (Usage)
+## 5. 会话页 `/sessions`
 
-**路径**：`/usage`  |  **文件**：`src/pages/Usage.tsx`  |  **数据**：`getSessionsUsage()` `getUsageCost()`
+**文件**：`src/pages/Sessions.tsx`
 
-### 功能模块
+### 当前功能
 
-#### 日期范围选择器
-- 开始日期 + 结束日期（YYYY-MM-DD 格式）
-- 筛选指定时间范围的用量数据
+- KPI：
+  - 总会话数
+  - direct 数
+  - group 数
+  - 总 token
+- 筛选：
+  - channel
+  - kind
+  - search
+- 表格：
+  - 标签 / key
+  - 渠道
+  - 类型
+  - 模型
+  - token
+  - 更新时间
+- 详情弹窗：
+  - 渠道、模型、供应商、sendPolicy、智能体、token
+  - thinkingLevel / reasoningLevel / responseUsage / contextTokens
 
-#### 多维聚合分析
-- **按模型聚合**：各模型的 Token 用量和费用
-- **按供应商聚合**：各供应商的 Token 用量和费用
-- **按智能体聚合**：各智能体的 Token 用量和费用
-- **按渠道聚合**：各渠道的 Token 用量和费用
-- **按日期聚合**：每日 Token 用量趋势
+### 运行能力降级
 
-#### 图表
-- 使用 Recharts 渲染趋势图和分布图
-- Token 格式化：M（百万）/ K（千）
-- 费用格式化：$
+`cli` 模式下会根据 `getRuntimeCapabilities(config).sessionMutations` 决定是否禁用：
 
-#### Top 20 会话
-- 按费用降序排列的前 20 个会话
-- 显示：会话标签 + 模型 + Token 数 + 费用
+- 重置会话
+- 删除会话
 
-#### 错误率
-- 计算并显示错误率统计
+因此会话页不是“永远可变更”的，文档需要结合当前运行能力理解。
 
----
+## 6. 渠道页 `/channels`
 
-## 7. 编排控制面 (Orchestration)
+**文件**：`src/pages/Channels.tsx`
 
-**路径**：`/orchestration`  |  **文件**：`src/pages/Orchestration.tsx`  |  **数据**：`loadOrchestrationRuntime()` + `importExperiencePreset()`
+### 当前功能
 
-### 功能模块
+- KPI：
+  - 总渠道数
+  - 总账号数
+  - 已连接账号数
+  - 错误数
+- 渠道卡片
+- 展开后账号详情
 
-#### 顶部控制面摘要
-- 当前模板 / 当前运行团队 / 任务统计
-- 与总览共用的编排健康条
+### 账号详情字段
 
-#### 任务控制侧栏
-- 紧凑版 Mission 发令台
-- 活跃任务卡片列表
-- 任务动向与日志 feed
-- 任务步骤时间线
-- 快速干预：暂停、恢复、催办、重置、审批通过/驳回、重派
+- `configured`
+- `linked`
+- `running`
+- `connected`
+- `lastConnectedAt`
+- `lastInboundAt`
+- `lastOutboundAt`
+- `activeRuns`
+- `reconnectAttempts`
+- `lastError`
+- `mode`
+- `dmPolicy`
+- `allowFrom`
 
-#### 活策略面板
-- 把 `workflow / authority / capabilities` 从静态配置变成运行态治理解释
-- 展示并发上限、审批压力、升级路径、门禁状态与执行能力边界
+## 7. 定时任务页 `/cron`
 
-#### 三种可视化视图
-- **执行图谱**：高亮当前任务路径、门禁和交付归并
-- **入口拓扑**：查看渠道如何进入组织网络
-- **组织架构**：查看层级覆盖与角色负载
+**文件**：`src/pages/CronJobs.tsx`
 
-#### 画布交互
-- 默认进入“布局拖动”模式，可直接拖动卡片并保存布局
-- 切换到“浏览锁定”后仅保留平移与查看，避免误触改动布局
+### 当前功能
 
-#### 模板导入与预览
-- 团队模板浏览器
-- 预览态与当前运行团队解耦：可边运行边查看其他模板
+- 任务列表
+- 新增任务弹窗
+- 编辑任务
+- 删除任务
+- 手动运行
+- 运行记录
 
-#### 事件驱动刷新
-- 订阅 `agent` / `chat` / `exec.approval.*` / `session.update` / `agent.status`
-- 在 Gateway 模式下自动更新任务与画布
+### 支持的 schedule
 
----
+- `at`
+- `every`
+- `cron`
 
-## 8. 拓扑视图 (Topology)
+### 支持的 payload
 
-**路径**：`/topology`  |  **文件**：`src/pages/Topology.tsx`  |  **数据**：`getAgents()` `getChannelsStatus()`
+- `agentTurn`
+- `systemEvent`
 
-### 功能模块
+## 8. 用量分析页 `/usage`
 
-- 旧入口兼容，现已重定向到 `/orchestration`
+**文件**：`src/pages/Usage.tsx`
 
-#### 交互式 DAG 拓扑图
-- **左侧**：渠道节点（来自 `channels.status`）
-- **右侧**：智能体节点（来自 `agents.list`）
-- **连线**：渠道→智能体的关联关系
-- **布局**：dagre 自动布局（LR 从左到右方向）
+### 当前功能
 
-#### 渠道节点样式
-- 连接状态颜色：绿=已连接，红=断开
-- 显示：渠道图标 + 名称 + 活跃运行数
+- 开始 / 结束日期筛选
+- 并行请求：
+  - `getSessionsUsage()`
+  - `getUsageCost()`
+- 图表：
+  - 日维度趋势
+  - 模型 / 供应商 / 智能体 / 渠道聚合
+  - Top 会话
+- 兼容旧 gateway 对 `mode` / `utcOffset` 参数的拒绝
 
-#### 智能体节点样式
-- 显示：Emoji + 名称 + 模型 + 供应商标签
+### 当前限制
 
-#### 交互能力
-- 缩放 / 平移 / 拖拽节点
-- MiniMap 小地图
-- Controls 控制栏
-- 点击节点查看详情
+- 会话抓取上限 `SESSION_FETCH_LIMIT = 1000`
+- 模型 / 供应商 / 会话等表格都有限定条数，避免 UI 过载
 
----
+## 9. 编排控制面 `/orchestration/*`
 
-## 8. 日志查看 (Logs)
+**文件**：`src/pages/Orchestration.tsx`
 
-**路径**：`/logs`  |  **文件**：`src/pages/Logs.tsx`  |  **数据**：`getLogs()`
+编排页已经拆成三个内部 section，由路径决定：
 
-### 功能模块
+| section | 路径前缀 | 说明 |
+|---|---|---|
+| `overview` | `/orchestration/overview` 或 `/orchestration` | 总览与团队激活 |
+| `tasks` | `/orchestration/tasks` | 任务工作台 |
+| `topology` | `/orchestration/topology` | 画布与拓扑 |
 
-#### 筛选栏
-- 级别筛选：下拉菜单（info / warn / error / debug）
-- 来源筛选：文本输入
-- 文本搜索：匹配消息内容或来源
+### 9.1 Overview 子视图
 
-#### 日志列表
-- 每条显示：时间戳（HH:MM:SS）+ 级别徽章 + 来源 + 消息
-- 级别颜色编码：info=蓝 / warn=黄 / error=红 / debug=灰
+当前模块：
 
-#### 自动刷新
-- 开关按钮：开启后每 5 秒自动拉取新日志
+- 顶部编排控制面摘要
+- `OrchestratorHealthStrip`
+- `OperationsMonitorBoard`
+- `MissionDispatchPanel`
+- `TeamPresetsPanel`
+- quick start 卡片
+- 右侧运行态摘要
+- 详情面板
 
-#### 自动滚动
-- 新日志到达时自动滚动到底部
+### 9.2 Tasks 子视图
 
-#### CSV 导出
-- 导出当前筛选结果为 CSV 文件
-- UTF-8 BOM 头，Excel 中文兼容
+当前模块：
 
----
+- `TaskKanbanBoard`
+- `ActiveTasksPanel`
+- `TaskActivityFeed`
+- `TaskControlCard`
 
-## 9. 配置向导 (Setup)
+`TaskControlCard` 目前支持：
 
-**路径**：`/setup`  |  **文件**：`src/pages/Setup.tsx`  |  **独立页面**（不使用 Layout）
+- 暂停 / 恢复接收
+- 催办
+- 重置会话
+- 审批通过 / 驳回
+- 快速重派
+
+### 9.3 Topology 子视图
+
+当前模块：
+
+- 视图切换：
+  - 执行图谱 `graph`
+  - 入口拓扑 `channels`
+  - 组织架构 `org`
+- 交互模式：
+  - 浏览锁定
+  - 布局拖动
+- 操作：
+  - 重新布局
+  - 保存布局
+  - 重置布局
+  - 专注阅读
+
+### 9.4 详情类型
+
+右侧详情面板当前支持：
+
+- team
+- quickstart
+- channel
+- role
+
+### 9.5 数据与刷新
+
+通过 `loadOrchestrationRuntime()` 加载；通过 `subscribeToOrchestrationEvents()` 刷新。
+
+## 10. 日志页 `/logs`
+
+**文件**：`src/pages/Logs.tsx`
+
+### 当前功能
+
+- 级别筛选
+- 来源筛选
+- 文本搜索
+- 自动刷新开关
+- CSV 导出
+
+### 当前实现注意点
+
+- 页面本地每 5 秒自动刷新一次（当开关打开时）
+- `getLogs()` 返回的已是前端解析后的 `LogEntry[]`
+- 导出字段为：时间戳、级别、来源、消息
+
+## 11. 配置页 `/setup`
+
+**文件**：`src/pages/Setup.tsx`
 
 ### 4 步流程
 
-#### Step 1: 运行模式
-- 当前为两选一卡片：
-  - **Demo 演示 (demo)**：Mock 数据展示完整功能
-  - **实时对接 (realtime)**：连接 OpenClaw Gateway
-- 各模式配有说明文字
+1. `mode`
+2. `connection`
+3. `test`
+4. `done`
 
-> 说明：`standalone` 仍作为历史环境变量 / 启动命令别名存在，但运行态会归一化到 `demo`。CLI / Hybrid 尚未进入实现态，设计规格见 [`docs/CLI-HYBRID-INTEGRATION.md`](./CLI-HYBRID-INTEGRATION.md)。
+### 当前支持的模式
 
-#### Step 2: 网关配置（实时模式专属）
-- WebSocket 地址输入（默认 `ws://127.0.0.1:18789`）
-- 认证方式选择：Token / Password
-- 认证凭据输入
+- `demo`
+- `realtime`
+- `cli`
+- `hybrid`
 
-#### Step 3: 连接测试（实时模式专属）
-- WebSocket 握手测试（10 秒超时）
-- 通过握手后的 Snapshot 验证连接
-- 状态显示：测试中 / 成功（显示 uptime）/ 失败（显示错误）
-- 可跳过测试
+### connection 步骤
 
-#### Step 4: 完成
-- 配置摘要展示
-- 保存配置到 localStorage
-- 「进入 claw-ops」按钮（导航到 `/`）
+根据模式动态显示：
 
----
+- bridge 配置
+  - `bridgeUrl`
+  - `bridgeAuthToken`
+- gateway 配置
+  - `gatewayUrl`
+  - `authType`
+  - `authToken` / `authPassword`
 
-## 共享功能
+### test 步骤
 
-### Layout 共享组件
+可能测试：
 
-所有主页面（除 Setup）共享以下 Layout 能力：
+- bridge `/health`
+- gateway 握手与 snapshot
 
-| 功能 | 位置 | 说明 |
-|------|------|------|
-| 侧边栏导航 | 左侧 | 8 项菜单 + 品牌标识 + 模式指示 |
-| 页面标题 | 顶栏 | 根据路径自动匹配 |
-| 待审批徽章 | 顶栏 | 显示全局待审批数量 |
-| 手动刷新 | 顶栏 | 触发 `<Outlet key={refreshKey}/>` 重新挂载 |
-| 自动刷新 | 顶栏 | 可切换倒计时自动刷新 |
+保存时还会把 `bridgeCapabilities` 写回本地配置。
 
-#### 侧边栏菜单项
+> 当前 Setup 没有“预设团队”额外步骤；如果某些设计文档提到插入 presets step，那是后续设想。
 
-| 图标 | 标签 | 路径 |
-|------|------|------|
-| 📊 | 总览 | `/` |
-| 🤖 | 智能体 | `/agents` |
-| 💬 | 会话 | `/sessions` |
-| 📡 | 渠道 | `/channels` |
-| ⏰ | 定时任务 | `/cron` |
-| 📈 | 用量分析 | `/usage` |
-| 🧩 | 编排 | `/orchestration` |
-| 📜 | 日志 | `/logs` |
+## 12. 兼容与历史文件
 
-### CSV 导出
+### `/topology`
 
-通过 `src/lib/export.ts` 提供：
-- UTF-8 BOM 头 (`\uFEFF`)，中文 Excel 直接打开无乱码
-- 自动生成文件名（含日期）
-- 浏览器端下载（Blob + URL.createObjectURL）
+- 当前仅作兼容重定向
+- 真正的拓扑入口是 `/orchestration/topology`
+
+### `src/pages/Topology.tsx`
+
+- 仍保留旧拓扑实现文件
+- 当前未被 `App.tsx` 使用
+- 可视为历史页面实现，不是当前导航结构的一部分

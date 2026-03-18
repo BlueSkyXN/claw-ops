@@ -1,8 +1,24 @@
 # claw-ops — 编排工作流升级 UX 设计规范
 **版本**: 1.0  |  **作者**: UI Design  |  **日期**: 2025
 
-> 将 claw-ops 从"拓扑查看器"升级为 Coze/Dify 风格的多智能体编排中心，
-> 同时完整保留现有马卡龙色彩系统与组件语言，并提供开箱即用的 OPC 超级助理团队预设入口。
+> **文档定位：设计稿，不是当前实现的 source of truth。**
+>
+> 当前代码已经完成其中一部分目标，但实现细节应以以下文件为准：
+>
+> - `src/App.tsx`
+> - `src/pages/Orchestration.tsx`
+> - `src/components/OperationsMonitorBoard.tsx`
+> - `src/components/TaskKanbanBoard.tsx`
+> - `docs/PAGES.md`
+>
+> 与当前实现相比，本文中仍包含尚未完全落地的概念设计、组件拆分设想和未来交互草案。
+>
+> 当前已落地的关键变化包括：
+>
+> - `/orchestration` 已成为主编排入口
+> - 编排页已拆分为 `overview` / `tasks` / `topology`
+> - `/topology` 已重定向到 `/orchestration/topology`
+> - `OperationsMonitorBoard` 与 `TaskKanbanBoard` 已存在并投入使用
 
 ---
 
@@ -95,12 +111,12 @@
 - 图标从 🔗 改为 🧩，标签从"拓扑"改为"编排"，传达可操作的编排工作台概念
 - 其余路由不变
 
-### 新增路由
+### 新增路由（当前实现已进一步细化）
 
 ```tsx
-// App.tsx 新增
-<Route path="/orchestration" element={<Orchestration />} />
-<Route path="/topology" element={<Navigate to="/orchestration" replace />} />
+// 当前 App.tsx
+<Route path="/orchestration/*" element={<Orchestration />} />
+<Route path="/topology" element={<Navigate to="/orchestration/topology" replace />} />
 ```
 
 ---
