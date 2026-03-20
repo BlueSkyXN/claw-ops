@@ -52,6 +52,7 @@ export interface MockQuickStartSummary {
   user: string
   channel: string
   prompt: string
+  ownerRoleId?: string
 }
 
 export interface MockExperienceSummary {

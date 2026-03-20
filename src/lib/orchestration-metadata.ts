@@ -14,6 +14,15 @@ export interface OrchestrationSessionMetadata {
   originUser?: string
   missionPriority?: string
   successCriteria?: string
+  workflowId?: string
+  workflowVersion?: string
+  workflowExecutionId?: string
+  workflowNodeId?: string
+  workflowParentNodeId?: string
+  workflowBranchId?: string
+  workflowInputRef?: string
+  workflowOutputRef?: string
+  workflowRetryCount?: number
 }
 
 type OrchestrationMetadataInput = Omit<OrchestrationSessionMetadata, 'controlPlane'>
@@ -26,6 +35,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function asString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined
+}
+
+function asNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 export function buildOrchestrationSessionMetadata(
@@ -98,6 +111,15 @@ export function getOrchestrationSessionMetadata(
     originUser: asString(source.originUser ?? source.origin_user),
     missionPriority: asString(source.missionPriority ?? source.mission_priority),
     successCriteria: asString(source.successCriteria ?? source.success_criteria),
+    workflowId: asString(source.workflowId ?? source.workflow_id),
+    workflowVersion: asString(source.workflowVersion ?? source.workflow_version),
+    workflowExecutionId: asString(source.workflowExecutionId ?? source.workflow_execution_id ?? source.executionId ?? source.execution_id),
+    workflowNodeId: asString(source.workflowNodeId ?? source.workflow_node_id ?? source.nodeId ?? source.node_id),
+    workflowParentNodeId: asString(source.workflowParentNodeId ?? source.workflow_parent_node_id ?? source.parentNodeId ?? source.parent_node_id),
+    workflowBranchId: asString(source.workflowBranchId ?? source.workflow_branch_id ?? source.branchId ?? source.branch_id),
+    workflowInputRef: asString(source.workflowInputRef ?? source.workflow_input_ref ?? source.inputRef ?? source.input_ref),
+    workflowOutputRef: asString(source.workflowOutputRef ?? source.workflow_output_ref ?? source.outputRef ?? source.output_ref),
+    workflowRetryCount: asNumber(source.workflowRetryCount ?? source.workflow_retry_count ?? source.retryCount ?? source.retry_count),
   }
 }
 

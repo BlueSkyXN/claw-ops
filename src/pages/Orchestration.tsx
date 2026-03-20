@@ -41,9 +41,11 @@ import TaskKanbanBoard from '../components/TaskKanbanBoard'
 import TaskActivityFeed from '../components/TaskActivityFeed'
 import TaskStepTimeline from '../components/TaskStepTimeline'
 import TeamPresetsPanel from '../components/TeamPresetsPanel'
+import WorkflowExecutionPanel from '../components/WorkflowExecutionPanel'
+import { buildWorkflowExecutionView } from '../lib/workflow-observer'
 
 type ViewMode = 'graph' | 'channels' | 'org'
-type OrchestrationSection = 'overview' | 'tasks' | 'topology'
+type OrchestrationSection = 'overview' | 'tasks' | 'execution' | 'topology'
 type InteractionMode = 'read' | 'edit'
 type NodeTraceState = 'idle' | 'active' | 'completed' | 'waiting' | 'blocked'
 
@@ -91,6 +93,7 @@ const EMPTY_LOAD: RoleLoadInfo = {
 
 function resolveSection(pathname: string): OrchestrationSection {
   if (pathname.startsWith('/orchestration/tasks')) return 'tasks'
+  if (pathname.startsWith('/orchestration/execution')) return 'execution'
   if (pathname.startsWith('/orchestration/topology')) return 'topology'
   return 'overview'
 }
@@ -894,6 +897,10 @@ export default function Orchestration() {
     () => runtime?.tasks.find((task) => task.id === selectedTaskId) ?? null,
     [runtime?.tasks, selectedTaskId],
   )
+  const workflowExecution = useMemo(
+    () => buildWorkflowExecutionView({ task: selectedTask, experience: activePreset }),
+    [activePreset, selectedTask],
+  )
   const trace = useMemo(() => buildExecutionTrace(selectedTask), [selectedTask])
   const graphTasks = useMemo(() => {
     if (!runtime || !loadedExperience || !activePreset) return []
@@ -999,7 +1006,12 @@ export default function Orchestration() {
     setMissionBusy(true)
     setError(null)
     try {
-      await dispatchMission(input)
+      await dispatchMission({
+        ...input,
+        workflowId: activePreset?.template.id,
+        workflowVersion: activePreset?.manifest.version,
+        workflowNodeId: 'trigger:manual-dispatch',
+      })
       if (selectedTemplateId) {
         await loadRuntime(selectedTemplateId)
       }
@@ -1009,7 +1021,7 @@ export default function Orchestration() {
     } finally {
       setMissionBusy(false)
     }
-  }, [loadRuntime, selectedTemplateId])
+  }, [activePreset, loadRuntime, selectedTemplateId])
 
   const viewingActiveTemplate = loadedExperience?.template.id === activePreset?.template.id
   const headerStats = useMemo(() => {
@@ -1081,10 +1093,11 @@ export default function Orchestration() {
       )}
 
       <div className="card p-3">
-        <div className="grid gap-3 lg:grid-cols-3">
+        <div className="grid gap-3 lg:grid-cols-4">
           {[
             { id: 'overview', to: '/orchestration/overview', label: '🏛 编排总览', hint: 'Mission、团队激活与健康概览' },
             { id: 'tasks', to: '/orchestration/tasks', label: '🧭 任务工作台', hint: '任务列表、干预动作与过程日志' },
+            { id: 'execution', to: '/orchestration/execution', label: '🧬 Execution', hint: 'workflow instance、节点状态与上下文' },
             { id: 'topology', to: '/orchestration/topology', label: '🕸️ 拓扑视图', hint: '执行图谱、入口拓扑与组织架构' },
           ].map((item) => (
             <NavLink
@@ -1166,6 +1179,7 @@ export default function Orchestration() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <NavLink to="/orchestration/tasks" className="btn-secondary text-xs">打开任务台</NavLink>
+                  <NavLink to="/orchestration/execution" className="btn-secondary text-xs">查看 execution</NavLink>
                   <NavLink to="/orchestration/topology" className="btn-secondary text-xs">查看拓扑</NavLink>
                 </div>
               </div>
@@ -1211,6 +1225,36 @@ export default function Orchestration() {
           </div>
 
           <div className="space-y-4 sticky top-6">
+            <TaskControlCard task={selectedTask} activePreset={activePreset} busyKey={actionBusyKey} onAction={handleTaskAction} />
+          </div>
+        </div>
+      )}
+
+      {section === 'execution' && (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] items-start">
+          <div className="space-y-4 min-w-0">
+            <WorkflowExecutionPanel execution={workflowExecution} />
+            <TaskActivityFeed
+              tasks={runtime?.tasks ?? []}
+              logs={runtime?.logs ?? []}
+              selectedTask={selectedTask}
+              title={selectedTask ? 'Execution 关联日志' : 'Execution 关联日志'}
+              subtitle={selectedTask ? '把 workflow instance 当前节点与相关任务日志放在一起看。' : '先从右侧选择一个任务实例，再查看 workflow execution。'}
+              maxItems={8}
+            />
+          </div>
+
+          <div className="space-y-4 sticky top-6">
+            <ActiveTasksPanel
+              title="选择 workflow instance"
+              subtitle={activePreset ? `当前从 ${activePreset.summary.name} 的运行态任务中选取实例。` : '尚未激活运行中的企业编排团队'}
+              tasks={runtime?.tasks ?? []}
+              selectedTaskId={selectedTaskId}
+              onSelectTask={(task) => setSelectedTaskId(task.id)}
+              onAction={handleTaskAction}
+              busyKey={actionBusyKey}
+              maxItems={6}
+            />
             <TaskControlCard task={selectedTask} activePreset={activePreset} busyKey={actionBusyKey} onAction={handleTaskAction} />
           </div>
         </div>

@@ -569,6 +569,9 @@ function buildSessions(
         orchestrationRootSessionKey: scenario.rootSessionKey,
         orchestrationOwnerRoleId: scenario.owner.manifest.id,
         orchestrationEntryNodeId: scenario.quickStart.id,
+        workflowId: template.id,
+        workflowExecutionId: scenario.taskId,
+        workflowNodeId: `trigger:${scenario.quickStart.id}`,
         controlAction: 'experience-seed',
         taskTitle: scenario.quickStart.title,
         originUser: scenario.quickStart.user,
@@ -611,6 +614,10 @@ function buildSessions(
           orchestrationFromRoleId: step.from,
           orchestrationToRoleId: step.to,
           orchestrationEntryNodeId: scenario.quickStart.id,
+          workflowId: template.id,
+          workflowExecutionId: scenario.taskId,
+          workflowNodeId: `role:${step.to}`,
+          workflowParentNodeId: `role:${step.from}`,
           controlAction: 'experience-seed',
           taskTitle: scenario.quickStart.title,
           originUser: scenario.quickStart.user,
@@ -857,6 +864,7 @@ function buildExperienceState(experience: LoadedExperiencePreset): MockWorkspace
     user: quickStart.user,
     channel: quickStart.channel,
     prompt: quickStart.prompt,
+    ownerRoleId: quickStart.ownerRoleId,
   }))
 
   const experienceSummary: MockExperienceSummary = {
@@ -912,6 +920,7 @@ export function buildExperienceSummaryRecord(experience: LoadedExperiencePreset)
       user: quickStart.user,
       channel: quickStart.channel,
       prompt: quickStart.prompt,
+      ownerRoleId: quickStart.ownerRoleId,
     })),
     quickStartCount: experience.summary.quickStarts.length,
     layerCounts: experience.summary.layerCounts,

@@ -43,6 +43,10 @@ export interface MissionDispatchInput {
   successCriteria: string
   ownerRoleId: string
   priority: 'normal' | 'high' | 'critical'
+  workflowId?: string
+  workflowVersion?: string
+  workflowNodeId?: string
+  workflowBranchId?: string
 }
 
 export type TaskInterventionAction =
@@ -247,6 +251,12 @@ function buildRerouteParams(task: TrackedTask, targetRoleId: string): ChatSendPa
       orchestrationFromRoleId: fromRoleId,
       orchestrationToRoleId: targetRoleId,
       orchestrationEntryNodeId: task.entryNodeId ?? undefined,
+      workflowId: task.workflowId ?? undefined,
+      workflowVersion: task.workflowVersion ?? undefined,
+      workflowExecutionId: task.workflowExecutionId,
+      workflowNodeId: `role:${targetRoleId}`,
+      workflowParentNodeId: task.workflowCurrentNodeId ?? undefined,
+      workflowBranchId: task.workflowBranchIds[0] ?? undefined,
       controlAction: 'reroute',
       taskTitle: task.title,
       originUser: task.originUser,
@@ -258,6 +268,7 @@ export async function dispatchMission(input: MissionDispatchInput): Promise<void
   const api = getAPI()
   const taskId = `mission-${slug(input.title)}-${Date.now()}`
   const sessionKey = buildMissionSessionKey(taskId, input.ownerRoleId)
+  const workflowExecutionId = taskId
   await api.sendChatMessage({
     sessionKey,
     message: buildMissionDispatchMessage(input),
@@ -270,6 +281,11 @@ export async function dispatchMission(input: MissionDispatchInput): Promise<void
       orchestrationTaskId: taskId,
       orchestrationRootSessionKey: sessionKey,
       orchestrationOwnerRoleId: input.ownerRoleId,
+      workflowId: input.workflowId,
+      workflowVersion: input.workflowVersion,
+      workflowExecutionId,
+      workflowNodeId: input.workflowNodeId ?? 'trigger:manual-dispatch',
+      workflowBranchId: input.workflowBranchId,
       controlAction: 'mission-dispatch',
       taskTitle: input.title,
       missionPriority: input.priority,
@@ -311,6 +327,11 @@ export async function performTaskIntervention(action: TaskInterventionAction): P
           orchestrationOwnerRoleId: action.task.ownerRoleId ?? undefined,
           orchestrationParentSessionKey: action.task.currentSessionKey ?? action.task.rootSessionKey,
           orchestrationEntryNodeId: action.task.entryNodeId ?? undefined,
+          workflowId: action.task.workflowId ?? undefined,
+          workflowVersion: action.task.workflowVersion ?? undefined,
+          workflowExecutionId: action.task.workflowExecutionId,
+          workflowNodeId: action.task.workflowCurrentNodeId ?? undefined,
+          workflowBranchId: action.task.workflowBranchIds[0] ?? undefined,
           controlAction: 'nudge',
           taskTitle: action.task.title,
           originUser: 'CEO',

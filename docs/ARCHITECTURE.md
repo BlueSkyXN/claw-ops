@@ -68,10 +68,11 @@ src/
 
 ### 编排页内部结构
 
-`Orchestration.tsx` 通过路径前缀解析三个 section：
+`Orchestration.tsx` 通过路径前缀解析四个 section：
 
 - `overview`
 - `tasks`
+- `execution`
 - `topology`
 
 因此 `/orchestration` 不再是单一拓扑页，而是编排控制面的入口。
@@ -209,6 +210,7 @@ type ConnectionState =
 - `health`
 - `selectedExperience`
 - `activeExperiencePreset`
+- `workflow execution view`
 
 ### 8.3 控制动作
 
@@ -226,6 +228,15 @@ type ConnectionState =
 - reroute
 - switch-model
 
+### 8.4 workflow core
+
+当前已新增最小 workflow core：
+
+- `src/types/workflow.ts`：定义 workflow definition / node / edge / execution view
+- `src/lib/workflow-definition.ts`：从预设团队或任务实例导出 workflow definition
+- `src/lib/workflow-observer.ts`：把 `TrackedTask` + 当前 preset 映射成 workflow instance 视图
+- `src/lib/orchestration-metadata.ts`：补充 `workflowId / workflowExecutionId / workflowNodeId` 等 metadata 键
+
 ## 9. 编排页组件分层
 
 ### overview 子视图
@@ -238,6 +249,13 @@ type ConnectionState =
 ### tasks 子视图
 
 - `TaskKanbanBoard`
+- `ActiveTasksPanel`
+- `TaskActivityFeed`
+- `TaskControlCard`
+
+### execution 子视图
+
+- `WorkflowExecutionPanel`
 - `ActiveTasksPanel`
 - `TaskActivityFeed`
 - `TaskControlCard`

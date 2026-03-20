@@ -13,7 +13,7 @@
 | `/channels` | 渠道 | `src/pages/Channels.tsx` | 渠道 / 账号状态 |
 | `/cron` | 定时任务 | `src/pages/CronJobs.tsx` | 定时任务 CRUD |
 | `/usage` | 用量分析 | `src/pages/Usage.tsx` | 用量与成本统计 |
-| `/orchestration/*` | 编排控制面 | `src/pages/Orchestration.tsx` | 内部分为 overview / tasks / topology |
+| `/orchestration/*` | 编排控制面 | `src/pages/Orchestration.tsx` | 内部分为 overview / tasks / execution / topology |
 | `/topology` | 兼容入口 | `src/App.tsx` | 重定向到 `/orchestration/topology` |
 | `/logs` | 日志 | `src/pages/Logs.tsx` | 日志过滤 / 导出 |
 
@@ -256,12 +256,13 @@
 
 **文件**：`src/pages/Orchestration.tsx`
 
-编排页已经拆成三个内部 section，由路径决定：
+编排页已经拆成四个内部 section，由路径决定：
 
 | section | 路径前缀 | 说明 |
 |---|---|---|
 | `overview` | `/orchestration/overview` 或 `/orchestration` | 总览与团队激活 |
 | `tasks` | `/orchestration/tasks` | 任务工作台 |
+| `execution` | `/orchestration/execution` | workflow instance 与节点执行视图 |
 | `topology` | `/orchestration/topology` | 画布与拓扑 |
 
 ### 9.1 Overview 子视图

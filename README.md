@@ -24,16 +24,17 @@ claw-ops 是一个纯前端 SPA，用来观察和控制 OpenClaw 运行态。当
 | 渠道 | `/channels` | 渠道卡片、账号状态、4 态状态灯、最近活动时间 |
 | 定时任务 | `/cron` | 任务新增 / 编辑 / 删除 / 手动触发、运行记录 |
 | 用量分析 | `/usage` | `sessions.usage` + `usage.cost` 双接口统计、日期范围筛选、模型 / 供应商 / 智能体 / 渠道聚合 |
-| 编排 | `/orchestration/*` | 分为 `overview` / `tasks` / `topology` 三个子视图 |
+| 编排 | `/orchestration/*` | 分为 `overview` / `tasks` / `execution` / `topology` 四个子视图 |
 | 日志 | `/logs` | 日志筛选、自动刷新、CSV 导出 |
 | 配置 | `/setup` | 4 步向导，支持 `demo` / `realtime` / `cli` / `hybrid` |
 
 ## 编排页当前结构
 
-编排页已经不是单一 `/orchestration` 视图，而是内部拆分为三个子视图：
+编排页已经不是单一 `/orchestration` 视图，而是内部拆分为四个子视图：
 
 - `/orchestration/overview`：运行态摘要、**OperationsMonitorBoard**、Mission 发令、团队模板
 - `/orchestration/tasks`：**TaskKanbanBoard**、任务列表、任务活动、单任务控制卡
+- `/orchestration/execution`：**WorkflowExecutionPanel**、workflow instance 上下文、节点状态、关联日志
 - `/orchestration/topology`：执行图谱 / 入口拓扑 / 组织架构三种画布视图
 
 兼容路由：
@@ -159,9 +160,11 @@ claw-ops 的统一数据入口是 `src/lib/api.ts` 中的 `DataAPI`：
      -> BridgeAPI
      -> HybridAPI
   -> orchestration runtime
-     -> task-tracker
-     -> flow-tracer
-     -> health-analyzer
+      -> task-tracker
+      -> flow-tracer
+      -> health-analyzer
+      -> workflow-definition
+      -> workflow-observer
 ```
 
 关键文件：
@@ -173,6 +176,9 @@ claw-ops 的统一数据入口是 `src/lib/api.ts` 中的 `DataAPI`：
 - `src/lib/gateway-client.ts`：WebSocket Gateway 客户端
 - `src/lib/bridge-client.ts`：bridge HTTP 客户端
 - `src/lib/orchestration-runtime.ts`：编排页运行时装配与控制动作
+- `src/lib/workflow-definition.ts`：workflow 定义骨架与从预设/任务导出的 definition
+- `src/lib/workflow-observer.ts`：把任务与步骤映射成 workflow execution 视图
+- `src/types/workflow.ts`：workflow definition / execution 类型
 - `src/types/openclaw.ts`：OpenClaw / 控制面使用的主要类型
 
 ## 文档导航

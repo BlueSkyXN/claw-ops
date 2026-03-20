@@ -32,6 +32,9 @@ export interface TaskStep {
   mandatory: boolean
   totalTokens: number
   totalCost: number
+  workflowExecutionId?: string | null
+  workflowNodeId?: string | null
+  workflowBranchId?: string | null
 }
 
 export interface TrackedTask {
@@ -60,6 +63,13 @@ export interface TrackedTask {
   totalCost: number
   latestEvent: string | null
   recommendedTargets: string[]
+  missionPriority: string | null
+  successCriteria: string | null
+  workflowId: string | null
+  workflowVersion: string | null
+  workflowExecutionId: string
+  workflowCurrentNodeId: string | null
+  workflowBranchIds: string[]
 }
 
 export interface TaskTrackerSummary {
@@ -106,6 +116,15 @@ interface WorkflowSessionMatch {
   workflowStep: PresetTeamWorkflowStep
   session: GatewaySessionRow
   parsed: ParsedSessionKey
+}
+
+type WorkflowQuickStartHint = {
+  id: string
+  title: string
+  user: string
+  channel: string
+  outcome?: string
+  ownerRoleId?: string
 }
 
 const statusPriority: Record<TaskStatus, number> = {
@@ -276,18 +295,19 @@ function buildWorkflowByFrom(workflow: PresetTeamWorkflowStep[]): Map<string, Pr
 
 function matchQuickStart(
   session: GatewaySessionRow,
-  quickStarts: LoadedExperiencePreset['summary']['quickStarts'],
+  quickStarts: WorkflowQuickStartHint[],
   ownerRoleId: string | null,
 ) {
   const title = normalizeText(session.label ?? session.derivedTitle)
   const user = normalizeText(session.displayName)
   const channel = session.channel ?? session.lastChannel ?? ''
-  const matches = quickStarts
+  const candidates = quickStarts
     .filter((quickStart) => {
       if (ownerRoleId && quickStart.ownerRoleId !== ownerRoleId) return false
       if (channel && quickStart.channel !== channel) return false
       return true
     })
+  const matches = candidates
     .map((quickStart) => {
       let score = 0
       if (title !== '' && normalizeText(quickStart.title) === title) score += 3
@@ -298,7 +318,9 @@ function matchQuickStart(
     .filter((candidate) => candidate.score > 0)
     .sort((left, right) => right.score - left.score)
 
-  if (matches.length === 0) return null
+  if (matches.length === 0) {
+    return candidates.length === 1 ? candidates[0] : null
+  }
   if (matches.length === 1 || matches[0].score > matches[1].score) return matches[0].quickStart
   return null
 }
@@ -436,6 +458,11 @@ function resolveRoleLayer(roleId: string | null, layerById: Map<string, PresetLa
   return layerById.get(roleId) ?? null
 }
 
+function inferAgentIdFromSessionKey(sessionKey: string, agentIds: string[]): string | null {
+  const sortedAgentIds = [...agentIds].sort((left, right) => right.length - left.length)
+  return sortedAgentIds.find((agentId) => sessionKey.endsWith(`-${agentId}`)) ?? null
+}
+
 function dedupe<T>(items: T[]): T[] {
   return Array.from(new Set(items))
 }
@@ -490,6 +517,7 @@ export function buildTrackedTasks({
   const roleNameById = new Map(roles.map((role) => [role.manifest.id, role.manifest.name]))
   const layerById = new Map(roles.map((role) => [role.manifest.id, role.manifest.layer]))
   const authorityById = new Map(roles.map((role) => [role.manifest.id, role.authority]))
+  const agentIds = agents.map((agent) => agent.id)
   const agentNameById = new Map(agents.map((agent) => [agent.id, agent.name ?? agent.identity?.name ?? agent.id]))
   const workflow = loadedExperience?.template.workflow ?? []
   const workflowByFrom = buildWorkflowByFrom(workflow)
@@ -502,13 +530,18 @@ export function buildTrackedTasks({
     if (metadata?.orchestrationRootSessionKey && metadata.orchestrationRootSessionKey !== session.key) return false
     return parsed.kind !== 'handoff' || metadata?.orchestrationRootSessionKey === session.key
   })
-  const quickStarts = loadedExperience?.summary.quickStarts ?? []
+  const quickStarts: WorkflowQuickStartHint[] = loadedExperience?.summary.quickStarts ?? experience?.quickStarts ?? []
 
   const tasks = rootSessions.map(({ session: rootSession, parsed }) => {
     const rootMetadata = getOrchestrationSessionMetadata(rootSession)
-    const ownerRoleId = rootMetadata?.orchestrationOwnerRoleId ?? parsed.roleId
-    const matchedQuickStart = matchQuickStart(rootSession, quickStarts, ownerRoleId)
+    const rootAgentId = rootSession.agentId ?? inferAgentIdFromSessionKey(rootSession.key, agentIds)
+    const ownerRoleHint = rootMetadata?.orchestrationOwnerRoleId ?? parsed.roleId
+    const matchedQuickStart = matchQuickStart(rootSession, quickStarts, ownerRoleHint)
+    const ownerRoleId = ownerRoleHint ?? matchedQuickStart?.ownerRoleId ?? rootAgentId ?? null
     const taskId = rootMetadata?.orchestrationTaskId ?? rootSession.key
+    const workflowId = rootMetadata?.workflowId ?? loadedExperience?.template.id ?? experience?.templateId ?? null
+    const workflowVersion = rootMetadata?.workflowVersion ?? loadedExperience?.manifest.version ?? null
+    const workflowExecutionId = rootMetadata?.workflowExecutionId ?? taskId
     const hintCandidates = buildTaskHintCandidates(rootSession, matchedQuickStart?.id ?? null)
     const explicitLinkedSessions = collectExplicitlyLinkedSessions(rootSession, sessions, taskId)
     const relatedHandoffSessions = parsedSessions
@@ -552,10 +585,10 @@ export function buildTrackedTasks({
     const rootApproval = relevantApprovals.find((approval) => approval.sessionKey === rootSession.key)
     steps.push({
       id: `${taskId}-owner`,
-      roleId: ownerRoleId ?? rootSession.key,
-      agentId: ownerRoleId ?? rootSession.key,
-      agentName: resolveRoleName(ownerRoleId, roleNameById, agentNameById),
-      layer: resolveRoleLayer(ownerRoleId, layerById),
+      roleId: ownerRoleId ?? rootAgentId ?? rootSession.key,
+      agentId: ownerRoleId ?? rootAgentId ?? rootSession.key,
+      agentName: resolveRoleName(ownerRoleId ?? rootAgentId ?? null, roleNameById, agentNameById),
+      layer: resolveRoleLayer(ownerRoleId ?? rootAgentId ?? null, layerById),
       fromRoleId: null,
       sessionKey: rootSession.key,
       startedAt,
@@ -573,9 +606,13 @@ export function buildTrackedTasks({
       mandatory: false,
       totalTokens: rootTotals?.totalTokens ?? rootSession.totalTokens ?? 0,
       totalCost: rootTotals?.totalCost ?? 0,
+      workflowExecutionId,
+      workflowNodeId: rootMetadata?.workflowNodeId ?? (ownerRoleId ?? rootAgentId ? `role:${ownerRoleId ?? rootAgentId}` : null),
+      workflowBranchId: rootMetadata?.workflowBranchId ?? null,
     })
 
     realizedWorkflowSessions.forEach(({ workflowStep, session, parsed: realizedKey }) => {
+      const sessionMetadata = getOrchestrationSessionMetadata(session)
       const approval = relevantApprovals.find((item) => item.sessionKey === session.key)
       const usageEntry = getSessionUsageTotals(
         usage?.sessions.find((entry) => entry.key === session.key)?.usage,
@@ -608,6 +645,9 @@ export function buildTrackedTasks({
         mandatory: workflowStep.mandatory,
         totalTokens: usageEntry?.totalTokens ?? session.totalTokens ?? 0,
         totalCost: usageEntry?.totalCost ?? 0,
+        workflowExecutionId: sessionMetadata?.workflowExecutionId ?? workflowExecutionId,
+        workflowNodeId: sessionMetadata?.workflowNodeId ?? `role:${workflowStep.to}`,
+        workflowBranchId: sessionMetadata?.workflowBranchId ?? null,
       })
     })
 
@@ -632,6 +672,9 @@ export function buildTrackedTasks({
         mandatory: workflowStep.mandatory,
         totalTokens: 0,
         totalCost: 0,
+        workflowExecutionId,
+        workflowNodeId: `role:${workflowStep.to}`,
+        workflowBranchId: null,
       })
     })
 
@@ -681,6 +724,11 @@ export function buildTrackedTasks({
     const currentRoleName = resolveRoleName(currentRoleId, roleNameById, agentNameById)
     const latestEvent = buildLatestEvent(logs, relatedSessionKeys, rootSession.label ?? matchedQuickStart?.title ?? rootSession.key)
     const currentAuthority = currentRoleId ? authorityById.get(currentRoleId) : null
+    const workflowBranchIds = dedupe(
+      steps
+        .map((step) => step.workflowBranchId)
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
+    )
 
     return {
       id: taskId,
@@ -708,6 +756,13 @@ export function buildTrackedTasks({
       totalCost: usageTotals.totalCost,
       latestEvent,
       recommendedTargets: dedupe(currentAuthority?.escalateTo.filter((roleId) => roleNameById.has(roleId)) ?? []),
+      missionPriority: rootMetadata?.missionPriority ?? null,
+      successCriteria: rootMetadata?.successCriteria ?? null,
+      workflowId,
+      workflowVersion,
+      workflowExecutionId,
+      workflowCurrentNodeId: currentStep?.workflowNodeId ?? (currentRoleId ? `role:${currentRoleId}` : null),
+      workflowBranchIds,
     } satisfies TrackedTask
   })
 
